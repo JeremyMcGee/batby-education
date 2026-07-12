@@ -1,9 +1,12 @@
 @page "/payments/list"
+@using BatbyEducation.Application.Commands.Payments
 @using BatbyEducation.Domain.Entities
 @using BatbyEducation.Domain.Enumerations
 @using BatbyEducation.Domain.Interfaces
+@using MediatR
 @inject IPaymentRepository PaymentRepository
 @inject IInvoiceRepository InvoiceRepository
+@inject IMediator Mediator
 @rendermode InteractiveServer
 
 <PageTitle>Payments</PageTitle>
@@ -27,6 +30,7 @@ else
                 <th>Amount</th>
                 <th>Date</th>
                 <th>Method</th>
+                <th>Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -40,6 +44,9 @@ else
                         <span class="badge @(payment.Method == PaymentMethod.Cash ? "bg-success" : "bg-info")">
                             @(payment.Method == PaymentMethod.Cash ? "Cash" : "Bank Transfer")
                         </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => VoidPayment(payment)">Void</button>
                     </td>
                 </tr>
             }
@@ -58,6 +65,12 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadPayments();
+    }
+
+    private async Task LoadPayments()
+    {
+        _loading = true;
         var payments = await PaymentRepository.GetAllAsync();
         _payments = payments.ToList();
 
@@ -65,6 +78,15 @@ else
         _invoiceNumbers = invoices.ToDictionary(i => i.Id, i => i.InvoiceNumber);
 
         _loading = false;
+    }
+
+    private async Task VoidPayment(Payment payment)
+    {
+        var result = await Mediator.Send(new VoidPaymentCommand(payment.Id));
+        if (result.IsSuccess)
+        {
+            await LoadPayments();
+        }
     }
 
     private string GetInvoiceNumber(Guid invoiceId)

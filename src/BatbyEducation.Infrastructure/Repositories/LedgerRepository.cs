@@ -49,4 +49,11 @@ public class LedgerRepository : ILedgerRepository
         await _context.LedgerEntries.AddAsync(entry);
         await _context.SaveChangesAsync();
     }
+
+    public async Task DeleteByPaymentIdAsync(Guid paymentId)
+    {
+        var entries = await _context.LedgerEntries.Where(e => e.PaymentId == paymentId).ToListAsync();
+        _context.LedgerEntries.RemoveRange(entries);
+        await _context.SaveChangesAsync();
+    }
 }

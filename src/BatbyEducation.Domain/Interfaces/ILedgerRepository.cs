@@ -9,4 +9,5 @@ public interface ILedgerRepository
     Task<decimal> GetTotalAsync(PaymentMethod method, DateOnly start, DateOnly end);
     Task<int> GetTransactionCountAsync(PaymentMethod method, DateOnly start, DateOnly end);
     Task AddAsync(LedgerEntry entry);
+    Task DeleteByPaymentIdAsync(Guid paymentId);
 }

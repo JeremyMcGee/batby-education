@@ -98,6 +98,27 @@ public class Invoice : AggregateRoot
     }
 
     /// <summary>
+    /// Reverses a payment amount, adjusting the invoice status accordingly.
+    /// </summary>
+    public void ReversePayment(decimal amount)
+    {
+        TotalPaid -= amount;
+        if (TotalPaid < 0) TotalPaid = 0;
+
+        // Recalculate status
+        if (TotalPaid <= 0)
+        {
+            Status = InvoiceStatus.Created;
+            PaidAt = null;
+        }
+        else if (TotalPaid < TotalAmount)
+        {
+            Status = InvoiceStatus.PartiallyPaid;
+            PaidAt = null;
+        }
+    }
+
+    /// <summary>
     /// Returns the outstanding balance on the invoice (minimum 0).
     /// </summary>
     public decimal GetOutstandingBalance()

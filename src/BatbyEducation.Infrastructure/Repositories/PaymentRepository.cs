@@ -45,9 +45,20 @@ public class PaymentRepository : IPaymentRepository
             .ToListAsync();
     }
 
+    public async Task<Payment?> GetByIdAsync(Guid id)
+    {
+        return await _context.Payments.FirstOrDefaultAsync(p => p.Id == id);
+    }
+
     public async Task AddAsync(Payment payment)
     {
         await _context.Payments.AddAsync(payment);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task DeleteAsync(Payment payment)
+    {
+        _context.Payments.Remove(payment);
         await _context.SaveChangesAsync();
     }
 }
