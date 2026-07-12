@@ -42,12 +42,7 @@ public class UpdateStudentCommandHandler : IRequestHandler<UpdateStudentCommand,
             return Result<Guid>.Failure(result.Errors);
         }
 
-        // Save audit entries created during the update
-        if (student.AuditHistory.Count > 0)
-        {
-            await _auditEntryRepository.AddRangeAsync(student.AuditHistory);
-        }
-
+        // EF Core will cascade-insert new audit entries via the navigation property
         await _studentRepository.UpdateAsync(student);
 
         return Result<Guid>.Success(student.Id);

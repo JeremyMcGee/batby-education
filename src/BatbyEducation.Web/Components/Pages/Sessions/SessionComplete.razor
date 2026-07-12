@@ -59,18 +59,30 @@ else
     <div class="row">
         <div class="col-md-6">
             <EditForm Model="_model" OnValidSubmit="HandleSubmit" FormName="CompleteSession">
+                <div class="mb-3 form-check">
+                    <input id="attended" type="checkbox" class="form-check-input" @bind="_model.Attended" />
+                    <label for="attended" class="form-check-label">Student attended</label>
+                </div>
+
                 <div class="mb-3">
                     <label for="actualDuration" class="form-label">Actual Duration (minutes)</label>
-                    <input id="actualDuration" type="number" class="form-control" @bind="_model.ActualDurationMinutes" min="15" max="240" />
+                    <input id="actualDuration" type="number" class="form-control" @bind="_model.ActualDurationMinutes" min="15" max="240" disabled="@(!_model.Attended)" />
                     <div class="form-text">Between 15 and 240 minutes. Leave as scheduled duration if unchanged.</div>
                 </div>
+
+                @if (!_model.Attended)
+                {
+                    <div class="alert alert-warning">
+                        If the student did not attend, this session will be marked as a late cancellation for billing purposes.
+                    </div>
+                }
 
                 <button type="submit" class="btn btn-success" disabled="@_submitting">
                     @if (_submitting)
                     {
                         <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
                     }
-                    Mark as Completed
+                    @(_model.Attended ? "Mark as Completed" : "Mark as No-Show")
                 </button>
                 <a href="/sessions" class="btn btn-secondary ms-2">Cancel</a>
             </EditForm>
@@ -125,26 +137,47 @@ else
     {
         _errors.Clear();
 
-        if (_model.ActualDurationMinutes < 15 || _model.ActualDurationMinutes > 240)
+        if (_model.Attended)
         {
-            _errors.Add("Actual duration must be between 15 and 240 minutes.");
-            return;
+            if (_model.ActualDurationMinutes < 15 || _model.ActualDurationMinutes > 240)
+            {
+                _errors.Add("Actual duration must be between 15 and 240 minutes.");
+                return;
+            }
         }
 
         _submitting = true;
 
         try
         {
-            var command = new CompleteSessionCommand(Id, _model.ActualDurationMinutes);
-            var result = await Mediator.Send(command);
-
-            if (result.IsSuccess)
+            if (_model.Attended)
             {
-                Navigation.NavigateTo("/sessions");
+                var command = new CompleteSessionCommand(Id, _model.ActualDurationMinutes);
+                var result = await Mediator.Send(command);
+
+                if (result.IsSuccess)
+                {
+                    Navigation.NavigateTo("/sessions");
+                }
+                else
+                {
+                    _errors.AddRange(result.Errors.Select(e => e.Message));
+                }
             }
             else
             {
-                _errors.AddRange(result.Errors.Select(e => e.Message));
+                // Student didn't attend — cancel as late cancellation (always billable)
+                var command = new CancelSessionCommand(Id);
+                var result = await Mediator.Send(command);
+
+                if (result.IsSuccess)
+                {
+                    Navigation.NavigateTo("/sessions");
+                }
+                else
+                {
+                    _errors.AddRange(result.Errors.Select(e => e.Message));
+                }
             }
         }
         finally
@@ -156,5 +189,6 @@ else
     private class CompleteModel
     {
         public int ActualDurationMinutes { get; set; }
+        public bool Attended { get; set; } = true;
     }
 }

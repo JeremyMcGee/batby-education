@@ -40,7 +40,15 @@ public class StudentRepository : IStudentRepository
 
     public async Task UpdateAsync(Student student)
     {
-        _context.Students.Update(student);
+        // Mark any untracked audit entries as Added so EF Core inserts them
+        foreach (var audit in student.AuditHistory)
+        {
+            var auditEntry = _context.Entry(audit);
+            if (auditEntry.State == EntityState.Detached || auditEntry.State == EntityState.Modified)
+            {
+                auditEntry.State = EntityState.Added;
+            }
+        }
         await _context.SaveChangesAsync();
     }
 }

@@ -99,6 +99,9 @@ Scheduled ──→ Completed
 Scheduled ──→ PendingConfirmation (session end time passed) ──→ Completed
 ```
 
+Note: The completion form provides an "Attended" toggle. If unchecked (no-show), 
+the system cancels the session as a late cancellation for billing purposes.
+
 ## Dependency Flow
 
 ```

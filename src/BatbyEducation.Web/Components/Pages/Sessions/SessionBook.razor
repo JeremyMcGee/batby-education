@@ -20,23 +20,23 @@
     <div class="col-md-6">
         <EditForm Model="_model" OnValidSubmit="HandleSubmit" FormName="BookSession">
             <div class="mb-3">
-                <label for="tutor" class="form-label">Tutor</label>
-                <select id="tutor" class="form-select" @bind="_model.TutorId" @bind:after="OnTutorChanged">
-                    <option value="">-- Select Tutor --</option>
-                    @foreach (var tutor in _tutors)
-                    {
-                        <option value="@tutor.Id">@tutor.Name</option>
-                    }
-                </select>
-            </div>
-
-            <div class="mb-3">
                 <label for="student" class="form-label">Student</label>
                 <select id="student" class="form-select" @bind="_model.StudentId" @bind:after="OnSelectionChanged">
                     <option value="">-- Select Student --</option>
                     @foreach (var student in _students)
                     {
                         <option value="@student.Id">@student.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="tutor" class="form-label">Tutor</label>
+                <select id="tutor" class="form-select" @bind="_model.TutorId" @bind:after="OnTutorChanged">
+                    <option value="">-- Select Tutor --</option>
+                    @foreach (var tutor in _tutors)
+                    {
+                        <option value="@tutor.Id">@tutor.Name</option>
                     }
                 </select>
             </div>
@@ -55,6 +55,7 @@
             <div class="mb-3">
                 <label for="date" class="form-label">Date</label>
                 <InputDate id="date" class="form-control" @bind-Value="_model.SessionDate" @bind-Value:after="OnDateChanged" />
+                <div class="form-text"><strong>@_model.SessionDate.ToString("dddd, dd MMMM yyyy")</strong></div>
             </div>
 
             @if (_availableSlots.Count > 0)

@@ -6,14 +6,15 @@ A booking and accounting system for a small tutoring business, built with .NET 8
 
 - **Student & Tutor Management** — Register students (with optional per-student hourly rates) and tutors, manage tutor availability
 - **Default Booking Preferences** — Configure per-student defaults (default tutor, subject, day, and timeslot) to streamline repeat bookings
-- **Session Booking** — Book tutoring sessions with conflict detection, availability checking, available slot picker, and computed rate display on the booking page
+- **Session Booking** — Select a student first (auto-populates tutor, subject, day, and timeslot from their defaults), then book with conflict detection, availability checking, available slot picker, and computed rate display
 - **Per-Session Rate Overrides** — Override the hourly rate on individual sessions when needed
 - **Effective Rate Priority Chain** — Invoice amounts resolve using: session rate override > student hourly rate > tutor hourly rate
+- **Attendance Tracking** — Completion form includes an "Attended" checkbox; unchecked triggers a no-show (late cancellation for billing)
 - **Session Lifecycle** — Cancel, reschedule, and mark sessions as completed with full audit trails
 - **Invoicing** — Generate invoices applying the rate priority chain automatically
 - **Payment Tracking** — Record cash and bank transfer payments with separate ledgers
 - **Financial Reporting** — Revenue reports, tutor earnings, outstanding balances, overdue invoices, and UK tax year summaries (6 April – 5 April)
-- **Calendar View** — Weekly calendar with tutor/student filtering and status colour coding
+- **Calendar View** — Weekly calendar with student name shown first and emboldened, tutor/student filtering, and status colour coding
 
 ## Documentation
 

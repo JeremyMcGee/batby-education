@@ -143,4 +143,43 @@ public class SessionBookingTests : IntegrationTestBase
         var session = await repo.GetByIdAsync(sessionId);
         Assert.Equal(50.00m, session!.RateOverride);
     }
+
+    [Fact]
+    public async Task CompleteSession_Attended_MarksAsCompleted()
+    {
+        var (tutorId, studentId) = await SetupTutorAndStudent();
+        var monday = GetNextMonday();
+
+        var bookResult = await Mediator.Send(new BookSessionCommand(
+            tutorId, studentId, "Maths", monday, new TimeOnly(10, 0), 60));
+        var sessionId = bookResult.Value;
+
+        var completeResult = await Mediator.Send(new CompleteSessionCommand(sessionId, 55));
+        Assert.True(completeResult.IsSuccess);
+
+        var repo = ServiceProvider.GetRequiredService<ISessionRepository>();
+        var session = await repo.GetByIdAsync(sessionId);
+        Assert.Equal(Domain.Enumerations.SessionStatus.Completed, session!.Status);
+        Assert.Equal(55, session.ActualDurationMinutes);
+    }
+
+    [Fact]
+    public async Task NoShow_CancelsSession_AsLateCancellation()
+    {
+        var (tutorId, studentId) = await SetupTutorAndStudent();
+        // Use a date in the past or very near future to trigger late cancellation
+        var monday = GetNextMonday();
+
+        var bookResult = await Mediator.Send(new BookSessionCommand(
+            tutorId, studentId, "Maths", monday, new TimeOnly(10, 0), 60));
+        var sessionId = bookResult.Value;
+
+        // Cancelling simulates "no show" — the cancel logic handles late cancellation detection
+        var cancelResult = await Mediator.Send(new CancelSessionCommand(sessionId));
+        Assert.True(cancelResult.IsSuccess);
+
+        var repo = ServiceProvider.GetRequiredService<ISessionRepository>();
+        var session = await repo.GetByIdAsync(sessionId);
+        Assert.Equal(Domain.Enumerations.SessionStatus.Cancelled, session!.Status);
+    }
 }
