@@ -82,7 +82,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var students = await StudentRepository.GetAllAsync();
+        var students = await StudentRepository.GetActiveAsync();
         _students = students.ToList();
     }
 

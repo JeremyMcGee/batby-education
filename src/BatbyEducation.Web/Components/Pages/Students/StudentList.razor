@@ -28,18 +28,37 @@ else
                 <th>Name</th>
                 <th>Email</th>
                 <th>Guardian</th>
+                <th>Status</th>
                 <th>Actions</th>
             </tr>
         </thead>
         <tbody>
             @foreach (var student in _students)
             {
-                <tr>
+                <tr class="@(student.IsActive ? "" : "text-muted")">
                     <td>@student.Name</td>
                     <td>@student.Email.Value</td>
                     <td>@student.GuardianName</td>
                     <td>
+                        @if (student.IsActive)
+                        {
+                            <span class="badge bg-success">Active</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary">Inactive</span>
+                        }
+                    </td>
+                    <td>
                         <a href="/students/edit/@student.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                        @if (student.IsActive)
+                        {
+                            <button class="btn btn-sm btn-outline-warning ms-1" @onclick="() => ToggleStatus(student)">Deactivate</button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-sm btn-outline-success ms-1" @onclick="() => ToggleStatus(student)">Activate</button>
+                        }
                     </td>
                 </tr>
             }
@@ -52,6 +71,17 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        _students = await StudentRepository.GetAllAsync();
+    }
+
+    private async Task ToggleStatus(BatbyEducation.Domain.Entities.Student student)
+    {
+        if (student.IsActive)
+            student.Deactivate();
+        else
+            student.Activate();
+
+        await StudentRepository.UpdateAsync(student);
         _students = await StudentRepository.GetAllAsync();
     }
 }

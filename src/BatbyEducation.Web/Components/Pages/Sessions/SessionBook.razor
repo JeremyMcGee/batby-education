@@ -153,7 +153,7 @@
     protected override async Task OnInitializedAsync()
     {
         _tutors = (await TutorRepository.GetAllAsync()).ToList();
-        _students = (await StudentRepository.GetAllAsync()).ToList();
+        _students = (await StudentRepository.GetActiveAsync()).ToList();
         _model.SessionDate = DateOnly.FromDateTime(DateTime.Today);
         _model.StartTime = TimeOnly.FromTimeSpan(TimeSpan.FromHours(9));
         _model.DurationMinutes = 60;

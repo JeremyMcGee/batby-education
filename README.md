@@ -14,7 +14,7 @@ A booking and accounting system for a small tutoring business, built with .NET 8
 - **Invoicing** — Generate invoices applying the rate priority chain automatically
 - **Payment Tracking** — Record cash and bank transfer payments with separate ledgers
 - **Financial Reporting** — Revenue reports, tutor earnings, outstanding balances, overdue invoices, and UK tax year summaries (6 April – 5 April)
-- **Calendar View** — Weekly calendar with student name shown first and emboldened, tutor/student filtering, and status colour coding
+- **Calendar View** — Weekly calendar serving as the session management hub: book, complete, cancel, and reschedule sessions all from the calendar, with student name shown first and emboldened, tutor/student filtering, and status colour coding
 
 ## Documentation
 

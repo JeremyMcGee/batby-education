@@ -18,6 +18,7 @@ public class Student : AggregateRoot
     public string? DefaultSubject { get; private set; }
     public DayOfWeek? DefaultDay { get; private set; }
     public TimeOnly? DefaultStartTime { get; private set; }
+    public bool IsActive { get; private set; } = true;
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
@@ -87,6 +88,7 @@ public class Student : AggregateRoot
             DefaultSubject = defaultSubject,
             DefaultDay = defaultDay,
             DefaultStartTime = defaultStartTime,
+            IsActive = true,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -217,6 +219,24 @@ public class Student : AggregateRoot
         UpdatedAt = now;
 
         return Result<Student>.Success(this);
+    }
+
+    /// <summary>
+    /// Deactivates the student so they no longer appear in pickers.
+    /// </summary>
+    public void Deactivate()
+    {
+        IsActive = false;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Reactivates the student so they appear in pickers again.
+    /// </summary>
+    public void Activate()
+    {
+        IsActive = true;
+        UpdatedAt = DateTime.UtcNow;
     }
 
     /// <summary>

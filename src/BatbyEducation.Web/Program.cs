@@ -74,3 +74,6 @@ app.MapGet("/api/invoices/{id:guid}/pdf", async (Guid id, IInvoiceRepository inv
 });
 
 app.Run();
+
+// Make Program accessible for WebApplicationFactory in integration tests
+public partial class Program { }

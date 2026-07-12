@@ -32,6 +32,12 @@ public class StudentRepository : IStudentRepository
         return await _context.Students.ToListAsync();
     }
 
+    public async Task<IReadOnlyList<Student>> GetActiveAsync()
+    {
+        var students = await _context.Students.ToListAsync();
+        return students.Where(s => s.IsActive).ToList();
+    }
+
     public async Task AddAsync(Student student)
     {
         await _context.Students.AddAsync(student);

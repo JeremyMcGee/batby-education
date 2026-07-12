@@ -39,6 +39,9 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
         builder.Property(s => s.HourlyRate)
             .HasPrecision(8, 2);
 
+        builder.Property(s => s.IsActive)
+            .HasDefaultValue(true);
+
         builder.Property(s => s.DefaultTutorId);
         builder.Property(s => s.DefaultSubject)
             .HasMaxLength(100);
