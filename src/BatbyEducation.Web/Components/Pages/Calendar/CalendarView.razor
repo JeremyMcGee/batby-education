@@ -1,0 +1,227 @@
+@page "/calendar"
+@rendermode InteractiveServer
+@using MediatR
+@using BatbyEducation.Application.DTOs
+@using BatbyEducation.Application.Queries
+@using BatbyEducation.Domain.Interfaces
+@inject IMediator Mediator
+@inject ITutorRepository TutorRepository
+@inject IStudentRepository StudentRepository
+
+<PageTitle>Calendar</PageTitle>
+
+<h3>Session Calendar</h3>
+
+<div class="calendar-controls mb-3 d-flex align-items-center gap-3 flex-wrap">
+    <div class="btn-group">
+        <button class="btn btn-outline-secondary" @onclick="PreviousWeek">&laquo; Previous</button>
+        <button class="btn btn-outline-secondary" @onclick="NextWeek">Next &raquo;</button>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+        <label for="startDate" class="form-label mb-0">From:</label>
+        <input id="startDate" type="date" class="form-control" style="width: auto;"
+               value="@_startDate.ToString("yyyy-MM-dd")"
+               @onchange="OnStartDateChanged" />
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+        <label for="endDate" class="form-label mb-0">To:</label>
+        <input id="endDate" type="date" class="form-control" style="width: auto;"
+               value="@_endDate.ToString("yyyy-MM-dd")"
+               @onchange="OnEndDateChanged" />
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+        <label for="tutorFilter" class="form-label mb-0">Tutor:</label>
+        <select id="tutorFilter" class="form-select" style="width: auto;" @onchange="OnTutorFilterChanged">
+            <option value="">All Tutors</option>
+            @if (_tutors != null)
+            {
+                @foreach (var tutor in _tutors)
+                {
+                    <option value="@tutor.Id">@tutor.Name</option>
+                }
+            }
+        </select>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+        <label for="studentFilter" class="form-label mb-0">Student:</label>
+        <select id="studentFilter" class="form-select" style="width: auto;" @onchange="OnStudentFilterChanged">
+            <option value="">All Students</option>
+            @if (_students != null)
+            {
+                @foreach (var student in _students)
+                {
+                    <option value="@student.Id">@student.Name</option>
+                }
+            }
+        </select>
+    </div>
+</div>
+
+<div class="calendar-header mb-2">
+    <strong>@_startDate.ToString("dd MMM yyyy") &ndash; @_endDate.ToString("dd MMM yyyy")</strong>
+</div>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else if (_calendar == null)
+{
+    <p class="text-danger">Failed to load calendar data.</p>
+}
+else if (_calendar.Days.Count == 0 || _calendar.Days.All(d => d.Sessions.Count == 0))
+{
+    <div class="alert alert-info">No sessions scheduled for this period.</div>
+}
+else
+{
+    <div class="calendar-grid">
+        @foreach (var day in _calendar.Days)
+        {
+            <div class="calendar-day mb-3">
+                <h5 class="day-header">@day.Date.ToString("dddd, dd MMMM yyyy")</h5>
+                @if (day.Sessions.Count == 0)
+                {
+                    <p class="text-muted ms-3">No sessions</p>
+                }
+                else
+                {
+                    <div class="session-list ms-3">
+                        @foreach (var session in day.Sessions)
+                        {
+                            <div class="session-card p-2 mb-2 rounded status-@session.StatusColour">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <strong>@session.StartTime.ToString("HH:mm")</strong>
+                                        <span class="ms-2">@session.Subject</span>
+                                    </div>
+                                    <span class="badge status-badge-@session.StatusColour">@session.Status</span>
+                                </div>
+                                <div class="session-details text-muted small mt-1">
+                                    <span>Tutor: @session.TutorName</span>
+                                    <span class="ms-3">Student: @session.StudentName</span>
+                                    <span class="ms-3">Duration: @session.DurationMinutes min</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+<div class="calendar-legend mt-3 d-flex gap-3 flex-wrap">
+    <span class="badge status-badge-blue">Scheduled</span>
+    <span class="badge status-badge-green">Completed</span>
+    <span class="badge status-badge-grey">Cancelled</span>
+    <span class="badge status-badge-amber">Pending Confirmation</span>
+    <span class="badge status-badge-red">Requires Rescheduling</span>
+</div>
+
+@code {
+    private CalendarDto? _calendar;
+    private bool _loading = true;
+    private DateOnly _startDate;
+    private DateOnly _endDate;
+    private Guid? _selectedTutorId;
+    private Guid? _selectedStudentId;
+    private IReadOnlyList<BatbyEducation.Domain.Entities.Tutor>? _tutors;
+    private IReadOnlyList<BatbyEducation.Domain.Entities.Student>? _students;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Default to current week (Monday–Sunday)
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var dayOfWeek = today.DayOfWeek;
+        var daysToMonday = dayOfWeek == DayOfWeek.Sunday ? 6 : (int)dayOfWeek - 1;
+        _startDate = today.AddDays(-daysToMonday);
+        _endDate = _startDate.AddDays(6);
+
+        // Load filter options
+        _tutors = await TutorRepository.GetAllAsync();
+        _students = await StudentRepository.GetAllAsync();
+
+        await LoadCalendar();
+    }
+
+    private async Task LoadCalendar()
+    {
+        _loading = true;
+
+        var query = new GetCalendarQuery(
+            StartDate: _startDate,
+            EndDate: _endDate,
+            TutorId: _selectedTutorId,
+            StudentId: _selectedStudentId);
+
+        var result = await Mediator.Send(query);
+
+        if (result.IsSuccess)
+        {
+            _calendar = result.Value;
+        }
+        else
+        {
+            _calendar = null;
+        }
+
+        _loading = false;
+    }
+
+    private async Task PreviousWeek()
+    {
+        _startDate = _startDate.AddDays(-7);
+        _endDate = _endDate.AddDays(-7);
+        await LoadCalendar();
+    }
+
+    private async Task NextWeek()
+    {
+        _startDate = _startDate.AddDays(7);
+        _endDate = _endDate.AddDays(7);
+        await LoadCalendar();
+    }
+
+    private async Task OnStartDateChanged(ChangeEventArgs e)
+    {
+        if (DateOnly.TryParse(e.Value?.ToString(), out var date))
+        {
+            _startDate = date;
+            if (_endDate < _startDate)
+            {
+                _endDate = _startDate.AddDays(6);
+            }
+            await LoadCalendar();
+        }
+    }
+
+    private async Task OnEndDateChanged(ChangeEventArgs e)
+    {
+        if (DateOnly.TryParse(e.Value?.ToString(), out var date))
+        {
+            _endDate = date;
+            if (_endDate < _startDate)
+            {
+                _startDate = _endDate.AddDays(-6);
+            }
+            await LoadCalendar();
+        }
+    }
+
+    private async Task OnTutorFilterChanged(ChangeEventArgs e)
+    {
+        _selectedTutorId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        await LoadCalendar();
+    }
+
+    private async Task OnStudentFilterChanged(ChangeEventArgs e)
+    {
+        _selectedStudentId = Guid.TryParse(e.Value?.ToString(), out var id) ? id : null;
+        await LoadCalendar();
+    }
+}

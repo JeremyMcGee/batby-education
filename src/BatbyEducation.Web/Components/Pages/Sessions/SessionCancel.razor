@@ -1,0 +1,146 @@
+@page "/sessions/{Id:guid}/cancel"
+@using BatbyEducation.Application.Commands.Sessions
+@using BatbyEducation.Domain.Entities
+@using BatbyEducation.Domain.Enumerations
+@using BatbyEducation.Domain.Interfaces
+@using MediatR
+@inject IMediator Mediator
+@inject ISessionRepository SessionRepository
+@inject ITutorRepository TutorRepository
+@inject IStudentRepository StudentRepository
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Cancel Session</PageTitle>
+
+<h1>Cancel Session</h1>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else if (_session is null)
+{
+    <div class="alert alert-danger">Session not found.</div>
+    <a href="/sessions" class="btn btn-secondary">Back to Sessions</a>
+}
+else if (_session.Status != SessionStatus.Scheduled)
+{
+    <div class="alert alert-warning">Only sessions with status 'Scheduled' can be cancelled. This session is currently '@_session.Status'.</div>
+    <a href="/sessions" class="btn btn-secondary">Back to Sessions</a>
+}
+else
+{
+    <div class="card mb-3">
+        <div class="card-header">Session Details</div>
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-3">Tutor</dt>
+                <dd class="col-sm-9">@_tutorName</dd>
+
+                <dt class="col-sm-3">Student</dt>
+                <dd class="col-sm-9">@_studentName</dd>
+
+                <dt class="col-sm-3">Subject</dt>
+                <dd class="col-sm-9">@_session.Subject</dd>
+
+                <dt class="col-sm-3">Date</dt>
+                <dd class="col-sm-9">@_session.SessionDate.ToString("dddd, dd MMMM yyyy")</dd>
+
+                <dt class="col-sm-3">Time</dt>
+                <dd class="col-sm-9">@_session.StartTime.ToString("HH:mm") - @_session.StartTime.AddMinutes(_session.ScheduledDurationMinutes).ToString("HH:mm")</dd>
+
+                <dt class="col-sm-3">Duration</dt>
+                <dd class="col-sm-9">@_session.ScheduledDurationMinutes minutes</dd>
+            </dl>
+        </div>
+    </div>
+
+    @if (_isLateCancellation)
+    {
+        <div class="alert alert-warning">
+            <strong>Late Cancellation Warning:</strong> This session starts in less than 24 hours. 
+            Cancelling now will be marked as a late cancellation and the session will be retained for billing purposes.
+        </div>
+    }
+
+    @if (_errors.Count > 0)
+    {
+        <div class="alert alert-danger">
+            <ul class="mb-0">
+                @foreach (var error in _errors)
+                {
+                    <li>@error</li>
+                }
+            </ul>
+        </div>
+    }
+
+    <div class="d-flex gap-2">
+        <button class="btn btn-danger" @onclick="ConfirmCancel" disabled="@_submitting">
+            @if (_submitting)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+            }
+            Confirm Cancellation
+        </button>
+        <a href="/sessions" class="btn btn-secondary">Go Back</a>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private Session? _session;
+    private string _tutorName = string.Empty;
+    private string _studentName = string.Empty;
+    private bool _isLateCancellation;
+    private bool _loading = true;
+    private bool _submitting;
+    private List<string> _errors = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _session = await SessionRepository.GetByIdAsync(Id);
+
+        if (_session is not null)
+        {
+            var tutor = await TutorRepository.GetByIdAsync(_session.TutorId);
+            _tutorName = tutor?.Name ?? "Unknown";
+
+            var student = await StudentRepository.GetByIdAsync(_session.StudentId);
+            _studentName = student?.Name ?? "Unknown";
+
+            var sessionStart = _session.SessionDate.ToDateTime(_session.StartTime);
+            _isLateCancellation = (sessionStart - DateTime.UtcNow).TotalHours < 24;
+        }
+
+        _loading = false;
+    }
+
+    private async Task ConfirmCancel()
+    {
+        _errors.Clear();
+        _submitting = true;
+
+        try
+        {
+            var command = new CancelSessionCommand(Id);
+            var result = await Mediator.Send(command);
+
+            if (result.IsSuccess)
+            {
+                Navigation.NavigateTo("/sessions");
+            }
+            else
+            {
+                _errors.AddRange(result.Errors.Select(e => e.Message));
+            }
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

@@ -1,0 +1,184 @@
+@page "/sessions/book"
+@using BatbyEducation.Application.Commands.Sessions
+@using BatbyEducation.Domain.Entities
+@using BatbyEducation.Domain.Interfaces
+@using MediatR
+@inject IMediator Mediator
+@inject ITutorRepository TutorRepository
+@inject IStudentRepository StudentRepository
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Book Session</PageTitle>
+
+<h1>Book New Session</h1>
+
+<div class="row">
+    <div class="col-md-6">
+        <EditForm Model="_model" OnValidSubmit="HandleSubmit" FormName="BookSession">
+            <div class="mb-3">
+                <label for="tutor" class="form-label">Tutor</label>
+                <select id="tutor" class="form-select" @bind="_model.TutorId" @bind:after="OnTutorChanged">
+                    <option value="">-- Select Tutor --</option>
+                    @foreach (var tutor in _tutors)
+                    {
+                        <option value="@tutor.Id">@tutor.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="student" class="form-label">Student</label>
+                <select id="student" class="form-select" @bind="_model.StudentId">
+                    <option value="">-- Select Student --</option>
+                    @foreach (var student in _students)
+                    {
+                        <option value="@student.Id">@student.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="subject" class="form-label">Subject</label>
+                <select id="subject" class="form-select" @bind="_model.Subject">
+                    <option value="">-- Select Subject --</option>
+                    @foreach (var subject in _availableSubjects)
+                    {
+                        <option value="@subject">@subject</option>
+                    }
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="date" class="form-label">Date</label>
+                <InputDate id="date" class="form-control" @bind-Value="_model.SessionDate" />
+            </div>
+
+            <div class="mb-3">
+                <label for="time" class="form-label">Start Time</label>
+                <input id="time" type="time" class="form-control" @bind="_model.StartTime" />
+            </div>
+
+            <div class="mb-3">
+                <label for="duration" class="form-label">Duration (minutes)</label>
+                <input id="duration" type="number" class="form-control" @bind="_model.DurationMinutes" min="15" max="240" />
+                <div class="form-text">Between 15 and 240 minutes</div>
+            </div>
+
+            <div class="mb-3">
+                <label for="rateOverride" class="form-label">Rate Override (£) <small class="text-muted">(optional)</small></label>
+                <input id="rateOverride" type="number" class="form-control" step="0.01" @bind="_model.RateOverride" />
+                <div class="form-text">Leave blank to use student/tutor default rate. Valid range: £0.01–£999.99</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" disabled="@_submitting">
+                @if (_submitting)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                }
+                Book Session
+            </button>
+            <a href="/sessions" class="btn btn-secondary ms-2">Cancel</a>
+        </EditForm>
+
+        @if (_errors.Count > 0)
+        {
+            <div class="alert alert-danger mt-3">
+                <ul class="mb-0">
+                    @foreach (var error in _errors)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private BookSessionModel _model = new();
+    private List<Tutor> _tutors = new();
+    private List<Student> _students = new();
+    private List<string> _availableSubjects = new();
+    private List<string> _errors = new();
+    private bool _submitting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _tutors = (await TutorRepository.GetAllAsync()).ToList();
+        _students = (await StudentRepository.GetAllAsync()).ToList();
+        _model.SessionDate = DateOnly.FromDateTime(DateTime.Today);
+        _model.StartTime = TimeOnly.FromTimeSpan(TimeSpan.FromHours(9));
+        _model.DurationMinutes = 60;
+    }
+
+    private void OnTutorChanged()
+    {
+        var selectedTutor = _tutors.FirstOrDefault(t => t.Id == _model.TutorId);
+        _availableSubjects = selectedTutor?.Subjects.ToList() ?? new List<string>();
+        _model.Subject = string.Empty;
+    }
+
+    private async Task HandleSubmit()
+    {
+        _errors.Clear();
+
+        if (_model.TutorId == Guid.Empty)
+        {
+            _errors.Add("Please select a tutor.");
+            return;
+        }
+
+        if (_model.StudentId == Guid.Empty)
+        {
+            _errors.Add("Please select a student.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_model.Subject))
+        {
+            _errors.Add("Please select a subject.");
+            return;
+        }
+
+        _submitting = true;
+
+        try
+        {
+            var command = new BookSessionCommand(
+                _model.TutorId,
+                _model.StudentId,
+                _model.Subject,
+                _model.SessionDate,
+                _model.StartTime,
+                _model.DurationMinutes,
+                _model.RateOverride);
+
+            var result = await Mediator.Send(command);
+
+            if (result.IsSuccess)
+            {
+                Navigation.NavigateTo("/sessions");
+            }
+            else
+            {
+                _errors.AddRange(result.Errors.Select(e => e.Message));
+            }
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private class BookSessionModel
+    {
+        public Guid TutorId { get; set; }
+        public Guid StudentId { get; set; }
+        public string Subject { get; set; } = string.Empty;
+        public DateOnly SessionDate { get; set; }
+        public TimeOnly StartTime { get; set; }
+        public int DurationMinutes { get; set; }
+        public decimal? RateOverride { get; set; }
+    }
+}

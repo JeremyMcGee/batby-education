@@ -1,0 +1,57 @@
+@page "/students"
+@rendermode InteractiveServer
+@using BatbyEducation.Domain.Interfaces
+@inject IStudentRepository StudentRepository
+@inject NavigationManager Navigation
+
+<PageTitle>Students</PageTitle>
+
+<h3>Students</h3>
+
+<div class="mb-3">
+    <a href="/students/register" class="btn btn-primary">Register New Student</a>
+</div>
+
+@if (_students == null)
+{
+    <p>Loading...</p>
+}
+else if (_students.Count == 0)
+{
+    <p>No students registered yet.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Guardian</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var student in _students)
+            {
+                <tr>
+                    <td>@student.Name</td>
+                    <td>@student.Email.Value</td>
+                    <td>@student.GuardianName</td>
+                    <td>
+                        <a href="/students/edit/@student.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<BatbyEducation.Domain.Entities.Student>? _students;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _students = await StudentRepository.GetAllAsync();
+    }
+}

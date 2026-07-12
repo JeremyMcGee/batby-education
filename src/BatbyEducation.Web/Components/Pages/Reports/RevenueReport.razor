@@ -1,0 +1,109 @@
+@page "/reports/revenue"
+@rendermode InteractiveServer
+@using MediatR
+@using BatbyEducation.Application.DTOs
+@using BatbyEducation.Application.Queries
+@inject IMediator Mediator
+
+<PageTitle>Revenue Report</PageTitle>
+
+<h1>Revenue Report</h1>
+<p class="text-muted">View total invoiced, payments received, outstanding balance, and cash/bank breakdown.</p>
+
+<div class="row mb-3">
+    <div class="col-md-3">
+        <label for="startDate" class="form-label">Start Date</label>
+        <input type="date" id="startDate" class="form-control" @bind="StartDate" />
+    </div>
+    <div class="col-md-3">
+        <label for="endDate" class="form-label">End Date</label>
+        <input type="date" id="endDate" class="form-control" @bind="EndDate" />
+    </div>
+    <div class="col-md-3 d-flex align-items-end">
+        <button class="btn btn-primary" @onclick="LoadReport" disabled="@IsLoading">
+            @if (IsLoading)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+            }
+            Generate Report
+        </button>
+    </div>
+</div>
+
+@if (Report is not null)
+{
+    <div class="table-responsive mt-4">
+        <table class="table table-bordered">
+            <thead class="table-light">
+                <tr>
+                    <th>Metric</th>
+                    <th class="text-end">Amount (£)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Total Invoiced</td>
+                    <td class="text-end">@Report.TotalInvoiced.ToString("N2")</td>
+                </tr>
+                <tr>
+                    <td>Total Payments Received</td>
+                    <td class="text-end">@Report.TotalPaymentsReceived.ToString("N2")</td>
+                </tr>
+                <tr>
+                    <td>Total Outstanding</td>
+                    <td class="text-end">@Report.TotalOutstanding.ToString("N2")</td>
+                </tr>
+                <tr class="table-info">
+                    <td>Cash Receipts</td>
+                    <td class="text-end">@Report.CashReceipts.ToString("N2")</td>
+                </tr>
+                <tr class="table-info">
+                    <td>Bank Transfer Receipts</td>
+                    <td class="text-end">@Report.BankTransferReceipts.ToString("N2")</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (ErrorMessage is not null)
+{
+    <div class="alert alert-danger mt-3">@ErrorMessage</div>
+}
+
+@code {
+    private DateTime StartDate { get; set; } = DateTime.Today.AddMonths(-1);
+    private DateTime EndDate { get; set; } = DateTime.Today;
+    private RevenueReportDto? Report { get; set; }
+    private bool IsLoading { get; set; }
+    private string? ErrorMessage { get; set; }
+
+    private async Task LoadReport()
+    {
+        ErrorMessage = null;
+        Report = null;
+
+        if (StartDate > EndDate)
+        {
+            ErrorMessage = "Start date must be before or equal to end date.";
+            return;
+        }
+
+        IsLoading = true;
+        try
+        {
+            var query = new GetRevenueReportQuery(
+                DateOnly.FromDateTime(StartDate),
+                DateOnly.FromDateTime(EndDate));
+            Report = await Mediator.Send(query);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error loading report: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+}

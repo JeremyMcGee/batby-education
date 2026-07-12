@@ -1,0 +1,191 @@
+@page "/payments"
+@using BatbyEducation.Application.Commands.Payments
+@using BatbyEducation.Domain.Entities
+@using BatbyEducation.Domain.Enumerations
+@using BatbyEducation.Domain.Interfaces
+@using MediatR
+@inject IMediator Mediator
+@inject IInvoiceRepository InvoiceRepository
+@inject IStudentRepository StudentRepository
+@rendermode InteractiveServer
+
+<PageTitle>Record Payment</PageTitle>
+
+<h3>Record Payment</h3>
+
+<div class="row">
+    <div class="col-md-6">
+        <EditForm Model="_model" OnValidSubmit="HandleSubmit" FormName="recordPayment">
+            <div class="mb-3">
+                <label for="invoice" class="form-label">Invoice</label>
+                <select id="invoice" class="form-select" @bind="_model.InvoiceId">
+                    <option value="">-- Select Invoice --</option>
+                    @foreach (var invoice in _eligibleInvoices)
+                    {
+                        <option value="@invoice.Id">
+                            @invoice.InvoiceNumber — @GetStudentName(invoice.StudentId) (Outstanding: £@invoice.GetOutstandingBalance().ToString("F2"))
+                        </option>
+                    }
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label for="amount" class="form-label">Amount (£)</label>
+                <InputNumber id="amount" class="form-control" @bind-Value="_model.Amount" />
+            </div>
+
+            <div class="mb-3">
+                <label for="paymentDate" class="form-label">Payment Date</label>
+                <InputDate id="paymentDate" class="form-control" @bind-Value="_model.PaymentDate" />
+            </div>
+
+            <div class="mb-3">
+                <label for="method" class="form-label">Payment Method</label>
+                <select id="method" class="form-select" @bind="_model.Method">
+                    <option value="@PaymentMethod.Cash">Cash</option>
+                    <option value="@PaymentMethod.BankTransfer">Bank Transfer</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary" disabled="@_submitting">
+                @if (_submitting)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                }
+                Record Payment
+            </button>
+            <a href="/payments/list" class="btn btn-secondary ms-2">View Payments</a>
+        </EditForm>
+
+        @if (_errors.Count > 0)
+        {
+            <div class="alert alert-danger mt-3">
+                <ul class="mb-0">
+                    @foreach (var error in _errors)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            </div>
+        }
+
+        @if (_successMessage is not null)
+        {
+            <div class="alert alert-success mt-3">
+                @_successMessage
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private PaymentRecordModel _model = new();
+    private List<Invoice> _eligibleInvoices = new();
+    private Dictionary<Guid, string> _studentNames = new();
+    private List<string> _errors = new();
+    private string? _successMessage;
+    private bool _submitting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var allInvoices = await InvoiceRepository.GetAllAsync();
+        _eligibleInvoices = allInvoices
+            .Where(i => i.Status != InvoiceStatus.Paid && i.Status != InvoiceStatus.Cancelled)
+            .ToList();
+
+        var students = await StudentRepository.GetAllAsync();
+        _studentNames = students.ToDictionary(s => s.Id, s => s.Name);
+    }
+
+    private async Task HandleSubmit()
+    {
+        _errors.Clear();
+        _successMessage = null;
+
+        if (_model.InvoiceId == Guid.Empty)
+        {
+            _errors.Add("Please select an invoice.");
+            return;
+        }
+
+        if (_model.Amount <= 0)
+        {
+            _errors.Add("Amount must be greater than zero.");
+            return;
+        }
+
+        _submitting = true;
+
+        try
+        {
+            var command = new RecordPaymentCommand(
+                _model.InvoiceId,
+                _model.Amount,
+                DateOnly.FromDateTime(_model.PaymentDate),
+                _model.Method);
+
+            var result = await Mediator.Send(command);
+
+            if (result.IsSuccess)
+            {
+                // Reload the invoice to get updated balance info
+                var invoice = await InvoiceRepository.GetByIdAsync(_model.InvoiceId);
+                if (invoice is not null)
+                {
+                    var remaining = invoice.GetOutstandingBalance();
+                    if (remaining > 0)
+                    {
+                        _successMessage = $"Payment recorded successfully. Remaining balance: £{remaining:F2}";
+                    }
+                    else if (invoice.TotalPaid > invoice.TotalAmount)
+                    {
+                        var credit = invoice.TotalPaid - invoice.TotalAmount;
+                        _successMessage = $"Payment recorded successfully. Invoice paid in full. Overpayment of £{credit:F2} has been credited to the student's account.";
+                    }
+                    else
+                    {
+                        _successMessage = "Payment recorded successfully. Invoice paid in full.";
+                    }
+                }
+                else
+                {
+                    _successMessage = "Payment recorded successfully.";
+                }
+
+                // Refresh eligible invoices
+                var allInvoices = await InvoiceRepository.GetAllAsync();
+                _eligibleInvoices = allInvoices
+                    .Where(i => i.Status != InvoiceStatus.Paid && i.Status != InvoiceStatus.Cancelled)
+                    .ToList();
+
+                // Reset form
+                _model = new PaymentRecordModel();
+            }
+            else
+            {
+                _errors.AddRange(result.Errors.Select(e => e.Message));
+            }
+        }
+        catch (Exception ex)
+        {
+            _errors.Add($"An error occurred: {ex.Message}");
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private string GetStudentName(Guid studentId)
+    {
+        return _studentNames.TryGetValue(studentId, out var name) ? name : "Unknown";
+    }
+
+    private class PaymentRecordModel
+    {
+        public Guid InvoiceId { get; set; }
+        public decimal Amount { get; set; }
+        public DateTime PaymentDate { get; set; } = DateTime.Today;
+        public PaymentMethod Method { get; set; } = PaymentMethod.Cash;
+    }
+}

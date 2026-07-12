@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BatbyEducation.Application/BatbyEducation.Application.csproj" />
+    <Project Path="src/BatbyEducation.Domain/BatbyEducation.Domain.csproj" />
+    <Project Path="src/BatbyEducation.Infrastructure/BatbyEducation.Infrastructure.csproj" />
+    <Project Path="src/BatbyEducation.Web/BatbyEducation.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BatbyEducation.Application.Tests/BatbyEducation.Application.Tests.csproj" />
+    <Project Path="tests/BatbyEducation.Domain.Tests/BatbyEducation.Domain.Tests.csproj" />
+    <Project Path="tests/BatbyEducation.Integration.Tests/BatbyEducation.Integration.Tests.csproj" />
+  </Folder>
+</Solution>

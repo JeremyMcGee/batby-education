@@ -1,0 +1,160 @@
+@page "/sessions/{Id:guid}/complete"
+@using BatbyEducation.Application.Commands.Sessions
+@using BatbyEducation.Domain.Entities
+@using BatbyEducation.Domain.Enumerations
+@using BatbyEducation.Domain.Interfaces
+@using MediatR
+@inject IMediator Mediator
+@inject ISessionRepository SessionRepository
+@inject ITutorRepository TutorRepository
+@inject IStudentRepository StudentRepository
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Complete Session</PageTitle>
+
+<h1>Complete Session</h1>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else if (_session is null)
+{
+    <div class="alert alert-danger">Session not found.</div>
+    <a href="/sessions" class="btn btn-secondary">Back to Sessions</a>
+}
+else if (_session.Status != SessionStatus.Scheduled && _session.Status != SessionStatus.PendingConfirmation)
+{
+    <div class="alert alert-warning">This session is not eligible for completion. Current status: '@_session.Status'.</div>
+    <a href="/sessions" class="btn btn-secondary">Back to Sessions</a>
+}
+else
+{
+    <div class="card mb-3">
+        <div class="card-header">Session Details</div>
+        <div class="card-body">
+            <dl class="row mb-0">
+                <dt class="col-sm-3">Tutor</dt>
+                <dd class="col-sm-9">@_tutorName</dd>
+
+                <dt class="col-sm-3">Student</dt>
+                <dd class="col-sm-9">@_studentName</dd>
+
+                <dt class="col-sm-3">Subject</dt>
+                <dd class="col-sm-9">@_session.Subject</dd>
+
+                <dt class="col-sm-3">Date</dt>
+                <dd class="col-sm-9">@_session.SessionDate.ToString("dddd, dd MMMM yyyy")</dd>
+
+                <dt class="col-sm-3">Time</dt>
+                <dd class="col-sm-9">@_session.StartTime.ToString("HH:mm") - @_session.StartTime.AddMinutes(_session.ScheduledDurationMinutes).ToString("HH:mm")</dd>
+
+                <dt class="col-sm-3">Scheduled Duration</dt>
+                <dd class="col-sm-9">@_session.ScheduledDurationMinutes minutes</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <EditForm Model="_model" OnValidSubmit="HandleSubmit" FormName="CompleteSession">
+                <div class="mb-3">
+                    <label for="actualDuration" class="form-label">Actual Duration (minutes)</label>
+                    <input id="actualDuration" type="number" class="form-control" @bind="_model.ActualDurationMinutes" min="15" max="240" />
+                    <div class="form-text">Between 15 and 240 minutes. Leave as scheduled duration if unchanged.</div>
+                </div>
+
+                <button type="submit" class="btn btn-success" disabled="@_submitting">
+                    @if (_submitting)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                    }
+                    Mark as Completed
+                </button>
+                <a href="/sessions" class="btn btn-secondary ms-2">Cancel</a>
+            </EditForm>
+
+            @if (_errors.Count > 0)
+            {
+                <div class="alert alert-danger mt-3">
+                    <ul class="mb-0">
+                        @foreach (var error in _errors)
+                        {
+                            <li>@error</li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private Session? _session;
+    private string _tutorName = string.Empty;
+    private string _studentName = string.Empty;
+    private CompleteModel _model = new();
+    private bool _loading = true;
+    private bool _submitting;
+    private List<string> _errors = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _session = await SessionRepository.GetByIdAsync(Id);
+
+        if (_session is not null)
+        {
+            var tutor = await TutorRepository.GetByIdAsync(_session.TutorId);
+            _tutorName = tutor?.Name ?? "Unknown";
+
+            var student = await StudentRepository.GetByIdAsync(_session.StudentId);
+            _studentName = student?.Name ?? "Unknown";
+
+            // Pre-fill with scheduled duration
+            _model.ActualDurationMinutes = _session.ScheduledDurationMinutes;
+        }
+
+        _loading = false;
+    }
+
+    private async Task HandleSubmit()
+    {
+        _errors.Clear();
+
+        if (_model.ActualDurationMinutes < 15 || _model.ActualDurationMinutes > 240)
+        {
+            _errors.Add("Actual duration must be between 15 and 240 minutes.");
+            return;
+        }
+
+        _submitting = true;
+
+        try
+        {
+            var command = new CompleteSessionCommand(Id, _model.ActualDurationMinutes);
+            var result = await Mediator.Send(command);
+
+            if (result.IsSuccess)
+            {
+                Navigation.NavigateTo("/sessions");
+            }
+            else
+            {
+                _errors.AddRange(result.Errors.Select(e => e.Message));
+            }
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private class CompleteModel
+    {
+        public int ActualDurationMinutes { get; set; }
+    }
+}

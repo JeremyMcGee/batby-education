@@ -1,0 +1,126 @@
+@page "/reports/payment-not-received"
+@rendermode InteractiveServer
+@using MediatR
+@using BatbyEducation.Application.DTOs
+@using BatbyEducation.Application.Queries
+@inject IMediator Mediator
+
+<PageTitle>Payment Not Received Report</PageTitle>
+
+<h1>Payment Not Received</h1>
+<p class="text-muted">Sessions where bank transfer payment has not been received on time.</p>
+
+<div class="mb-3">
+    <button class="btn btn-primary" @onclick="LoadReport" disabled="@IsLoading">
+        @if (IsLoading)
+        {
+            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+        }
+        Refresh
+    </button>
+</div>
+
+@if (Report is not null)
+{
+    <h3>Upcoming Sessions</h3>
+    @if (Report.UpcomingSessions.Count == 0)
+    {
+        <div class="alert alert-info mb-4">No upcoming sessions with payment pending.</div>
+    }
+    else
+    {
+        <div class="table-responsive mb-4">
+            <table class="table table-striped table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Student Name</th>
+                        <th>Guardian Name</th>
+                        <th>Session Date</th>
+                        <th class="text-end">Expected Amount (£)</th>
+                        <th class="text-end">Days Since Deadline</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in Report.UpcomingSessions)
+                    {
+                        <tr>
+                            <td>@entry.StudentName</td>
+                            <td>@entry.GuardianName</td>
+                            <td>@entry.SessionDate.ToString("dd/MM/yyyy")</td>
+                            <td class="text-end">@entry.ExpectedAmount.ToString("N2")</td>
+                            <td class="text-end">@entry.DaysSinceDeadline</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <h3>Past Due Sessions</h3>
+    @if (Report.PastDueSessions.Count == 0)
+    {
+        <div class="alert alert-info">No past due sessions.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped table-bordered">
+                <thead class="table-warning">
+                    <tr>
+                        <th>Student Name</th>
+                        <th>Guardian Name</th>
+                        <th>Session Date</th>
+                        <th class="text-end">Expected Amount (£)</th>
+                        <th class="text-end">Days Since Deadline</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in Report.PastDueSessions)
+                    {
+                        <tr class="table-warning">
+                            <td>@entry.StudentName</td>
+                            <td>@entry.GuardianName</td>
+                            <td>@entry.SessionDate.ToString("dd/MM/yyyy")</td>
+                            <td class="text-end">@entry.ExpectedAmount.ToString("N2")</td>
+                            <td class="text-end">@entry.DaysSinceDeadline</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@if (ErrorMessage is not null)
+{
+    <div class="alert alert-danger mt-3">@ErrorMessage</div>
+}
+
+@code {
+    private PaymentNotReceivedReportDto? Report { get; set; }
+    private bool IsLoading { get; set; }
+    private string? ErrorMessage { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReport();
+    }
+
+    private async Task LoadReport()
+    {
+        ErrorMessage = null;
+        IsLoading = true;
+        try
+        {
+            Report = await Mediator.Send(new GetPaymentNotReceivedQuery());
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error loading report: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+}

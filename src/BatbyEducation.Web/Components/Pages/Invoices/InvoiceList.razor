@@ -1,0 +1,122 @@
+@page "/invoices"
+@using BatbyEducation.Domain.Entities
+@using BatbyEducation.Domain.Enumerations
+@using BatbyEducation.Domain.Interfaces
+@inject IInvoiceRepository InvoiceRepository
+@inject IStudentRepository StudentRepository
+@rendermode InteractiveServer
+
+<PageTitle>Invoices</PageTitle>
+
+<h3>Invoices</h3>
+
+<div class="mb-3">
+    <label for="statusFilter" class="form-label">Filter by Status:</label>
+    <select id="statusFilter" class="form-select" style="max-width: 200px;" @onchange="OnStatusFilterChanged">
+        <option value="">All</option>
+        @foreach (var status in Enum.GetValues<InvoiceStatus>())
+        {
+            <option value="@status">@status</option>
+        }
+    </select>
+</div>
+
+@if (_loading)
+{
+    <p>Loading invoices...</p>
+}
+else if (_invoices.Count == 0)
+{
+    <p class="text-muted">No invoices found.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Invoice Number</th>
+                <th>Student</th>
+                <th>Period</th>
+                <th>Amount</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var invoice in _filteredInvoices)
+            {
+                var isOverdue = invoice.Status == InvoiceStatus.Overdue
+                    || (invoice.Status == InvoiceStatus.Issued && DateTime.UtcNow > invoice.IssuedAt.AddDays(30))
+                    || (invoice.Status == InvoiceStatus.PartiallyPaid && DateTime.UtcNow > invoice.IssuedAt.AddDays(30));
+                <tr class="@(isOverdue ? "table-danger" : "")">
+                    <td>@invoice.InvoiceNumber</td>
+                    <td>@GetStudentName(invoice.StudentId)</td>
+                    <td>@invoice.BillingPeriodStart.ToString("dd/MM/yyyy") – @invoice.BillingPeriodEnd.ToString("dd/MM/yyyy")</td>
+                    <td>£@invoice.TotalAmount.ToString("F2")</td>
+                    <td>
+                        @if (isOverdue && invoice.Status != InvoiceStatus.Overdue)
+                        {
+                            <span class="badge bg-danger">Overdue</span>
+                        }
+                        else
+                        {
+                            <span class="badge @GetStatusBadgeClass(invoice.Status)">@invoice.Status</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<div class="mt-3">
+    <a href="/invoices/generate" class="btn btn-primary">Generate New Invoice</a>
+</div>
+
+@code {
+    private List<Invoice> _invoices = new();
+    private List<Invoice> _filteredInvoices = new();
+    private Dictionary<Guid, string> _studentNames = new();
+    private InvoiceStatus? _statusFilter;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var invoices = await InvoiceRepository.GetAllAsync();
+        _invoices = invoices.ToList();
+
+        var students = await StudentRepository.GetAllAsync();
+        _studentNames = students.ToDictionary(s => s.Id, s => s.Name);
+
+        ApplyFilter();
+        _loading = false;
+    }
+
+    private void OnStatusFilterChanged(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        _statusFilter = string.IsNullOrEmpty(value) ? null : Enum.Parse<InvoiceStatus>(value);
+        ApplyFilter();
+    }
+
+    private void ApplyFilter()
+    {
+        _filteredInvoices = _statusFilter.HasValue
+            ? _invoices.Where(i => i.Status == _statusFilter.Value).ToList()
+            : _invoices.ToList();
+    }
+
+    private string GetStudentName(Guid studentId)
+    {
+        return _studentNames.TryGetValue(studentId, out var name) ? name : "Unknown";
+    }
+
+    private string GetStatusBadgeClass(InvoiceStatus status) => status switch
+    {
+        InvoiceStatus.Issued => "bg-primary",
+        InvoiceStatus.PartiallyPaid => "bg-warning text-dark",
+        InvoiceStatus.Paid => "bg-success",
+        InvoiceStatus.Overdue => "bg-danger",
+        InvoiceStatus.Cancelled => "bg-secondary",
+        _ => "bg-secondary"
+    };
+}

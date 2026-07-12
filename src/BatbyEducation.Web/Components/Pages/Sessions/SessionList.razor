@@ -1,0 +1,202 @@
+@page "/sessions"
+@using BatbyEducation.Application.Commands.Sessions
+@using BatbyEducation.Domain.Entities
+@using BatbyEducation.Domain.Enumerations
+@using BatbyEducation.Domain.Interfaces
+@using MediatR
+@inject ISessionRepository SessionRepository
+@inject ITutorRepository TutorRepository
+@inject IStudentRepository StudentRepository
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Sessions</PageTitle>
+
+<h1>Sessions</h1>
+
+<div class="mb-3">
+    <a href="/sessions/book" class="btn btn-primary">Book New Session</a>
+</div>
+
+@if (_loading)
+{
+    <p>Loading sessions...</p>
+}
+else if (_sessions.Count == 0)
+{
+    <p>No sessions found.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Duration</th>
+                <th>Tutor</th>
+                <th>Student</th>
+                <th>Subject</th>
+                <th>Rate Override</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var session in _sessions)
+            {
+                <tr>
+                    <td>@session.SessionDate.ToString("yyyy-MM-dd")</td>
+                    <td>@session.StartTime.ToString("HH:mm")</td>
+                    <td>@session.ScheduledDurationMinutes min</td>
+                    <td>@GetTutorName(session.TutorId)</td>
+                    <td>@GetStudentName(session.StudentId)</td>
+                    <td>@session.Subject</td>
+                    <td>
+                        @if (session.RateOverride.HasValue)
+                        {
+                            <span>£@session.RateOverride.Value.ToString("F2")</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">Default</span>
+                        }
+                        @if (session.Status == SessionStatus.Scheduled)
+                        {
+                            <button class="btn btn-sm btn-outline-secondary ms-1" @onclick="() => EditRate(session)">✏️</button>
+                        }
+                    </td>
+                    <td>
+                        <span class="badge @GetStatusBadgeClass(session.Status)">
+                            @session.Status
+                        </span>
+                    </td>
+                    <td>
+                        @if (session.Status == SessionStatus.Scheduled)
+                        {
+                            <a href="@($"/sessions/{session.Id}/cancel")" class="btn btn-sm btn-outline-danger me-1">Cancel</a>
+                            <a href="@($"/sessions/{session.Id}/reschedule")" class="btn btn-sm btn-outline-warning me-1">Reschedule</a>
+                            <a href="@($"/sessions/{session.Id}/complete")" class="btn btn-sm btn-outline-success">Complete</a>
+                        }
+                        else if (session.Status == SessionStatus.PendingConfirmation)
+                        {
+                            <a href="@($"/sessions/{session.Id}/complete")" class="btn btn-sm btn-outline-success">Complete</a>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (_editingSession is not null)
+    {
+        <div class="card mt-3 p-3">
+            <h5>Edit Rate Override</h5>
+            <div class="row g-2 align-items-end">
+                <div class="col-auto">
+                    <label class="form-label">Rate (£)</label>
+                    <input type="number" class="form-control" step="0.01" @bind="_editRateValue" />
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-primary" @onclick="SaveRate">Save</button>
+                    <button class="btn btn-secondary ms-1" @onclick="CancelEditRate">Cancel</button>
+                </div>
+            </div>
+            @if (_editRateError is not null)
+            {
+                <div class="text-danger mt-1">@_editRateError</div>
+            }
+            <small class="text-muted">Leave blank and save to clear override. Valid range: £0.01–£999.99</small>
+        </div>
+    }
+}
+
+@code {
+    private List<Session> _sessions = new();
+    private Dictionary<Guid, string> _tutorNames = new();
+    private Dictionary<Guid, string> _studentNames = new();
+    private bool _loading = true;
+    private Session? _editingSession;
+    private decimal? _editRateValue;
+    private string? _editRateError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var rangeEnd = today.AddDays(90);
+
+        _sessions = (await SessionRepository.GetByDateRangeAsync(today.AddDays(-30), rangeEnd))
+            .OrderBy(s => s.SessionDate)
+            .ThenBy(s => s.StartTime)
+            .ToList();
+
+        var tutors = await TutorRepository.GetAllAsync();
+        _tutorNames = tutors.ToDictionary(t => t.Id, t => t.Name);
+
+        var students = await StudentRepository.GetAllAsync();
+        _studentNames = students.ToDictionary(s => s.Id, s => s.Name);
+
+        _loading = false;
+    }
+
+    private string GetTutorName(Guid tutorId) =>
+        _tutorNames.TryGetValue(tutorId, out var name) ? name : "Unknown";
+
+    private string GetStudentName(Guid studentId) =>
+        _studentNames.TryGetValue(studentId, out var name) ? name : "Unknown";
+
+    private string GetStatusBadgeClass(SessionStatus status) => status switch
+    {
+        SessionStatus.Scheduled => "bg-primary",
+        SessionStatus.Completed => "bg-success",
+        SessionStatus.Cancelled => "bg-secondary",
+        SessionStatus.PendingConfirmation => "bg-warning text-dark",
+        SessionStatus.RequiresRescheduling => "bg-danger",
+        SessionStatus.Rescheduled => "bg-info",
+        _ => "bg-secondary"
+    };
+
+    private void EditRate(Session session)
+    {
+        _editingSession = session;
+        _editRateValue = session.RateOverride;
+        _editRateError = null;
+    }
+
+    private async Task SaveRate()
+    {
+        _editRateError = null;
+
+        if (_editingSession is null)
+            return;
+
+        var command = new UpdateSessionRateCommand(_editingSession.Id, _editRateValue);
+        var result = await Mediator.Send(command);
+
+        if (result.IsSuccess)
+        {
+            // Refresh the sessions list
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var rangeEnd = today.AddDays(90);
+            _sessions = (await SessionRepository.GetByDateRangeAsync(today.AddDays(-30), rangeEnd))
+                .OrderBy(s => s.SessionDate)
+                .ThenBy(s => s.StartTime)
+                .ToList();
+
+            _editingSession = null;
+            _editRateValue = null;
+        }
+        else
+        {
+            _editRateError = string.Join(", ", result.Errors.Select(e => e.Message));
+        }
+    }
+
+    private void CancelEditRate()
+    {
+        _editingSession = null;
+        _editRateValue = null;
+        _editRateError = null;
+    }
+}

@@ -1,0 +1,211 @@
+@page "/tutors/{Id:guid}/availability"
+@rendermode InteractiveServer
+@using BatbyEducation.Application.Commands.Tutors
+@using BatbyEducation.Domain.Common
+@using BatbyEducation.Domain.Interfaces
+@using MediatR
+@inject IMediator Mediator
+@inject ITutorRepository TutorRepository
+@inject ITutorAvailabilityRepository AvailabilityRepository
+@inject NavigationManager Navigation
+
+<PageTitle>Tutor Availability</PageTitle>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else if (_notFound)
+{
+    <div class="alert alert-warning">Tutor not found.</div>
+    <a href="/tutors" class="btn btn-secondary">Back to Tutors</a>
+}
+else
+{
+    <h3>Availability — @_tutorName</h3>
+
+    @if (_successMessage is not null)
+    {
+        <div class="alert alert-success">@_successMessage</div>
+    }
+
+    @if (_generalError is not null)
+    {
+        <div class="alert alert-danger">@_generalError</div>
+    }
+
+    <div class="row">
+        <div class="col-md-8">
+            <h5>Weekly Schedule</h5>
+            <table class="table table-bordered table-sm">
+                <thead>
+                    <tr>
+                        <th>Day</th>
+                        <th>Start</th>
+                        <th>End</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var slot in _slots.OrderBy(s => s.DayOfWeek).ThenBy(s => s.StartTime))
+                    {
+                        <tr>
+                            <td>@slot.DayOfWeek</td>
+                            <td>@slot.StartTime.ToString("HH:mm")</td>
+                            <td>@slot.EndTime.ToString("HH:mm")</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveSlot(slot)">Remove</button>
+                            </td>
+                        </tr>
+                    }
+                    @if (_slots.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="4" class="text-muted text-center">No availability slots configured.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="row mt-3">
+        <div class="col-md-6">
+            <h5>Add Slot</h5>
+            <div class="row g-2 align-items-end">
+                <div class="col-auto">
+                    <label class="form-label">Day</label>
+                    <select class="form-select" @bind="_newSlotDay">
+                        <option value="1">Monday</option>
+                        <option value="2">Tuesday</option>
+                        <option value="3">Wednesday</option>
+                        <option value="4">Thursday</option>
+                        <option value="5">Friday</option>
+                        <option value="6">Saturday</option>
+                        <option value="0">Sunday</option>
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <label class="form-label">Start</label>
+                    <input type="time" class="form-control" @bind="_newSlotStart" />
+                </div>
+                <div class="col-auto">
+                    <label class="form-label">End</label>
+                    <input type="time" class="form-control" @bind="_newSlotEnd" />
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-success" @onclick="AddSlot">Add</button>
+                </div>
+            </div>
+            @if (_slotError is not null)
+            {
+                <div class="text-danger small mt-1">@_slotError</div>
+            }
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <button class="btn btn-primary" @onclick="SaveAvailability" disabled="@_saving">
+            @(_saving ? "Saving..." : "Save Availability")
+        </button>
+        <a href="/tutors" class="btn btn-secondary ms-2">Back to Tutors</a>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _loading = true;
+    private bool _notFound;
+    private string _tutorName = string.Empty;
+    private List<SlotModel> _slots = new();
+    private string? _generalError;
+    private string? _successMessage;
+    private string? _slotError;
+    private bool _saving;
+
+    private int _newSlotDay = 1;
+    private TimeOnly _newSlotStart = new(9, 0);
+    private TimeOnly _newSlotEnd = new(10, 0);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var tutor = await TutorRepository.GetByIdAsync(Id);
+        if (tutor is null)
+        {
+            _notFound = true;
+        }
+        else
+        {
+            _tutorName = tutor.Name;
+            var existing = await AvailabilityRepository.GetByTutorIdAsync(Id);
+            _slots = existing
+                .Where(a => a.IsAvailable && a.SpecificDate is null)
+                .Select(a => new SlotModel(a.DayOfWeek, a.StartTime, a.EndTime))
+                .ToList();
+        }
+        _loading = false;
+    }
+
+    private void AddSlot()
+    {
+        _slotError = null;
+        var day = (DayOfWeek)_newSlotDay;
+
+        if (_newSlotEnd <= _newSlotStart)
+        {
+            _slotError = "End time must be after start time.";
+            return;
+        }
+
+        var duration = (_newSlotEnd - _newSlotStart).TotalMinutes;
+        if (duration < 30)
+        {
+            _slotError = "Slot must be at least 30 minutes.";
+            return;
+        }
+
+        _slots.Add(new SlotModel(day, _newSlotStart, _newSlotEnd));
+    }
+
+    private void RemoveSlot(SlotModel slot)
+    {
+        _slots.Remove(slot);
+    }
+
+    private async Task SaveAvailability()
+    {
+        _generalError = null;
+        _successMessage = null;
+        _saving = true;
+
+        try
+        {
+            var slotDtos = _slots
+                .Select(s => new AvailabilitySlotDto(s.DayOfWeek, s.StartTime, s.EndTime, null, true))
+                .ToList();
+
+            var command = new SetTutorAvailabilityCommand(Id, slotDtos);
+            var result = await Mediator.Send(command);
+
+            if (result.IsSuccess)
+            {
+                _successMessage = "Availability saved successfully.";
+            }
+            else
+            {
+                _generalError = string.Join("; ", result.Errors.Select(e => e.Message));
+            }
+        }
+        catch (Exception ex)
+        {
+            _generalError = ex.Message;
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private record SlotModel(DayOfWeek DayOfWeek, TimeOnly StartTime, TimeOnly EndTime);
+}

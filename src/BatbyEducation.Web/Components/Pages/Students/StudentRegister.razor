@@ -1,0 +1,139 @@
+@page "/students/register"
+@rendermode InteractiveServer
+@using BatbyEducation.Application.Commands.Students
+@using BatbyEducation.Domain.Common
+@using MediatR
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+
+<PageTitle>Register Student</PageTitle>
+
+<h3>Register New Student</h3>
+
+<div class="row">
+    <div class="col-md-6">
+        <EditForm Model="_model" OnValidSubmit="HandleSubmit" FormName="RegisterStudent">
+            <div class="mb-3">
+                <label for="name" class="form-label">Name *</label>
+                <InputText id="name" class="form-control" @bind-Value="_model.Name" />
+                @if (GetError("Name") is { } nameErr)
+                {
+                    <div class="text-danger small mt-1">@nameErr</div>
+                }
+            </div>
+
+            <div class="mb-3">
+                <label for="email" class="form-label">Email *</label>
+                <InputText id="email" class="form-control" @bind-Value="_model.Email" />
+                @if (GetError("Email") is { } emailErr)
+                {
+                    <div class="text-danger small mt-1">@emailErr</div>
+                }
+            </div>
+
+            <div class="mb-3">
+                <label for="phone" class="form-label">Phone Number *</label>
+                <InputText id="phone" class="form-control" @bind-Value="_model.PhoneNumber" />
+                @if (GetError("PhoneNumber") is { } phoneErr)
+                {
+                    <div class="text-danger small mt-1">@phoneErr</div>
+                }
+            </div>
+
+            <div class="mb-3">
+                <label for="guardianName" class="form-label">Guardian Name *</label>
+                <InputText id="guardianName" class="form-control" @bind-Value="_model.GuardianName" />
+                @if (GetError("GuardianName") is { } guardianNameErr)
+                {
+                    <div class="text-danger small mt-1">@guardianNameErr</div>
+                }
+            </div>
+
+            <div class="mb-3">
+                <label for="guardianEmail" class="form-label">Guardian Email *</label>
+                <InputText id="guardianEmail" class="form-control" @bind-Value="_model.GuardianEmail" />
+                @if (GetError("GuardianEmail") is { } guardianEmailErr)
+                {
+                    <div class="text-danger small mt-1">@guardianEmailErr</div>
+                }
+            </div>
+
+            <div class="mb-3">
+                <label for="hourlyRate" class="form-label">Hourly Rate (£) <small class="text-muted">(optional)</small></label>
+                <InputNumber id="hourlyRate" class="form-control" @bind-Value="_model.HourlyRate" />
+                <div class="form-text">Leave blank to use the tutor's default rate. Valid range: £0.01–£999.99</div>
+                @if (GetError("HourlyRate") is { } rateErr)
+                {
+                    <div class="text-danger small mt-1">@rateErr</div>
+                }
+            </div>
+
+            @if (_generalError is not null)
+            {
+                <div class="alert alert-danger">@_generalError</div>
+            }
+
+            <button type="submit" class="btn btn-primary" disabled="@_submitting">
+                @(_submitting ? "Registering..." : "Register Student")
+            </button>
+            <a href="/students" class="btn btn-secondary ms-2">Cancel</a>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private StudentFormModel _model = new();
+    private List<ValidationError> _errors = new();
+    private string? _generalError;
+    private bool _submitting;
+
+    private string? GetError(string field) =>
+        _errors.FirstOrDefault(e => e.Field == field)?.Message;
+
+    private async Task HandleSubmit()
+    {
+        _errors.Clear();
+        _generalError = null;
+        _submitting = true;
+
+        try
+        {
+            var command = new RegisterStudentCommand(
+                _model.Name,
+                _model.Email,
+                _model.PhoneNumber,
+                _model.GuardianName,
+                _model.GuardianEmail,
+                _model.HourlyRate);
+
+            var result = await Mediator.Send(command);
+
+            if (result.IsSuccess)
+            {
+                Navigation.NavigateTo("/students");
+            }
+            else
+            {
+                _errors = result.Errors.ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            _generalError = ex.Message;
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private class StudentFormModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string PhoneNumber { get; set; } = string.Empty;
+        public string GuardianName { get; set; } = string.Empty;
+        public string GuardianEmail { get; set; } = string.Empty;
+        public decimal? HourlyRate { get; set; }
+    }
+}

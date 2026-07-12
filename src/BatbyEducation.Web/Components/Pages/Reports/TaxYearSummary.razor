@@ -1,0 +1,154 @@
+@page "/reports/tax-year"
+@rendermode InteractiveServer
+@using MediatR
+@using BatbyEducation.Application.DTOs
+@using BatbyEducation.Application.Queries.TaxYear
+@inject IMediator Mediator
+
+<PageTitle>Tax Year Summary</PageTitle>
+
+<h1>Tax Year Summary</h1>
+<p class="text-muted">Complete financial summary for a UK tax year (6 April to 5 April) with monthly breakdown.</p>
+
+<div class="row mb-3">
+    <div class="col-md-3">
+        <label for="taxYear" class="form-label">Tax Year Starting</label>
+        <select id="taxYear" class="form-select" @bind="SelectedYear">
+            @for (int year = DateTime.Today.Year; year >= DateTime.Today.Year - 5; year--)
+            {
+                <option value="@year">@year / @(year + 1)</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-3 d-flex align-items-end">
+        <button class="btn btn-primary" @onclick="LoadReport" disabled="@IsLoading">
+            @if (IsLoading)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+            }
+            Generate Report
+        </button>
+    </div>
+</div>
+
+@if (Summary is not null)
+{
+    <h3 class="mt-4">Summary: 6 April @SelectedYear – 5 April @(SelectedYear + 1)</h3>
+
+    <div class="table-responsive mt-3 mb-4">
+        <table class="table table-bordered">
+            <thead class="table-light">
+                <tr>
+                    <th>Metric</th>
+                    <th class="text-end">Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Total Income Received</td>
+                    <td class="text-end">£@Summary.TotalIncome.ToString("N2")</td>
+                </tr>
+                <tr>
+                    <td>Cash Ledger Total</td>
+                    <td class="text-end">£@Summary.CashLedgerTotal.ToString("N2")</td>
+                </tr>
+                <tr>
+                    <td>Bank Transfer Ledger Total</td>
+                    <td class="text-end">£@Summary.BankTransferLedgerTotal.ToString("N2")</td>
+                </tr>
+                <tr>
+                    <td>Total Completed Sessions</td>
+                    <td class="text-end">@Summary.TotalCompletedSessions</td>
+                </tr>
+                <tr>
+                    <td>Total Hours Tutored</td>
+                    <td class="text-end">@Summary.TotalHoursTutored.ToString("N1")</td>
+                </tr>
+                <tr>
+                    <td>Total Invoiced Amount</td>
+                    <td class="text-end">£@Summary.TotalInvoicedAmount.ToString("N2")</td>
+                </tr>
+                <tr>
+                    <td>Outstanding Receivables (at year end)</td>
+                    <td class="text-end">£@Summary.OutstandingReceivables.ToString("N2")</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Monthly Breakdown</h3>
+
+    @if (Summary.MonthlyBreakdown.Count > 0)
+    {
+        <div class="table-responsive">
+            <table class="table table-striped table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Month</th>
+                        <th>Period</th>
+                        <th class="text-end">Invoiced (£)</th>
+                        <th class="text-end">Collected (£)</th>
+                        <th class="text-end">Outstanding (£)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var month in Summary.MonthlyBreakdown)
+                    {
+                        <tr>
+                            <td>@month.Month</td>
+                            <td>@month.StartDate.ToString("dd/MM/yyyy") – @month.EndDate.ToString("dd/MM/yyyy")</td>
+                            <td class="text-end">@month.InvoicedRevenue.ToString("N2")</td>
+                            <td class="text-end">@month.CollectedRevenue.ToString("N2")</td>
+                            <td class="text-end">@month.OutstandingAmount.ToString("N2")</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot class="table-light">
+                    <tr>
+                        <th colspan="2">Total</th>
+                        <th class="text-end">@Summary.MonthlyBreakdown.Sum(m => m.InvoicedRevenue).ToString("N2")</th>
+                        <th class="text-end">@Summary.MonthlyBreakdown.Sum(m => m.CollectedRevenue).ToString("N2")</th>
+                        <th class="text-end">@Summary.MonthlyBreakdown.Sum(m => m.OutstandingAmount).ToString("N2")</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">No data available for this tax year.</div>
+    }
+}
+
+@if (ErrorMessage is not null)
+{
+    <div class="alert alert-danger mt-3">@ErrorMessage</div>
+}
+
+@code {
+    private int SelectedYear { get; set; } = DateTime.Today.Month >= 4 && DateTime.Today.Day >= 6
+        ? DateTime.Today.Year
+        : DateTime.Today.Year - 1;
+    private TaxYearSummaryDto? Summary { get; set; }
+    private bool IsLoading { get; set; }
+    private string? ErrorMessage { get; set; }
+
+    private async Task LoadReport()
+    {
+        ErrorMessage = null;
+        Summary = null;
+        IsLoading = true;
+        try
+        {
+            Summary = await Mediator.Send(new GetTaxYearSummaryQuery(SelectedYear));
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error loading report: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+}

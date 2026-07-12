@@ -1,0 +1,121 @@
+@page "/tutors/register"
+@rendermode InteractiveServer
+@using BatbyEducation.Application.Commands.Tutors
+@using BatbyEducation.Domain.Common
+@using MediatR
+@inject IMediator Mediator
+@inject NavigationManager Navigation
+
+<PageTitle>Register Tutor</PageTitle>
+
+<h3>Register New Tutor</h3>
+
+<div class="row">
+    <div class="col-md-6">
+        <EditForm Model="_model" OnValidSubmit="HandleSubmit" FormName="RegisterTutor">
+            <div class="mb-3">
+                <label for="name" class="form-label">Name *</label>
+                <InputText id="name" class="form-control" @bind-Value="_model.Name" />
+                @if (GetError("Name") is { } nameErr)
+                {
+                    <div class="text-danger small mt-1">@nameErr</div>
+                }
+            </div>
+
+            <div class="mb-3">
+                <label for="email" class="form-label">Email *</label>
+                <InputText id="email" class="form-control" @bind-Value="_model.Email" />
+                @if (GetError("Email") is { } emailErr)
+                {
+                    <div class="text-danger small mt-1">@emailErr</div>
+                }
+            </div>
+
+            <div class="mb-3">
+                <label for="rate" class="form-label">Hourly Rate (£) *</label>
+                <InputNumber id="rate" class="form-control" @bind-Value="_model.HourlyRate" />
+                @if (GetError("HourlyRate") is { } rateErr)
+                {
+                    <div class="text-danger small mt-1">@rateErr</div>
+                }
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Subjects * (one per line)</label>
+                <InputTextArea class="form-control" rows="4" @bind-Value="_model.SubjectsText" />
+                @if (GetError("Subjects") is { } subjectsErr)
+                {
+                    <div class="text-danger small mt-1">@subjectsErr</div>
+                }
+                <small class="text-muted">Enter each subject on a new line (1–20 subjects)</small>
+            </div>
+
+            @if (_generalError is not null)
+            {
+                <div class="alert alert-danger">@_generalError</div>
+            }
+
+            <button type="submit" class="btn btn-primary" disabled="@_submitting">
+                @(_submitting ? "Registering..." : "Register Tutor")
+            </button>
+            <a href="/tutors" class="btn btn-secondary ms-2">Cancel</a>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private TutorFormModel _model = new();
+    private List<ValidationError> _errors = new();
+    private string? _generalError;
+    private bool _submitting;
+
+    private string? GetError(string field) =>
+        _errors.FirstOrDefault(e => e.Field == field)?.Message;
+
+    private async Task HandleSubmit()
+    {
+        _errors.Clear();
+        _generalError = null;
+        _submitting = true;
+
+        try
+        {
+            var subjects = _model.SubjectsText
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+            var command = new RegisterTutorCommand(
+                _model.Name,
+                _model.Email,
+                subjects,
+                _model.HourlyRate);
+
+            var result = await Mediator.Send(command);
+
+            if (result.IsSuccess)
+            {
+                Navigation.NavigateTo("/tutors");
+            }
+            else
+            {
+                _errors = result.Errors.ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            _generalError = ex.Message;
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private class TutorFormModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public decimal HourlyRate { get; set; }
+        public string SubjectsText { get; set; } = string.Empty;
+    }
+}

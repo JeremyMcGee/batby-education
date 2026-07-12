@@ -1,0 +1,59 @@
+@page "/tutors"
+@rendermode InteractiveServer
+@using BatbyEducation.Domain.Interfaces
+@inject ITutorRepository TutorRepository
+@inject NavigationManager Navigation
+
+<PageTitle>Tutors</PageTitle>
+
+<h3>Tutors</h3>
+
+<div class="mb-3">
+    <a href="/tutors/register" class="btn btn-primary">Register New Tutor</a>
+</div>
+
+@if (_tutors == null)
+{
+    <p>Loading...</p>
+}
+else if (_tutors.Count == 0)
+{
+    <p>No tutors registered yet.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Subjects</th>
+                <th>Rate (£/hr)</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var tutor in _tutors)
+            {
+                <tr>
+                    <td>@tutor.Name</td>
+                    <td>@tutor.Email.Value</td>
+                    <td>@string.Join(", ", tutor.Subjects)</td>
+                    <td>£@tutor.HourlyRate.ToString("F2")</td>
+                    <td>
+                        <a href="/tutors/@tutor.Id/availability" class="btn btn-sm btn-outline-primary">Availability</a>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyList<BatbyEducation.Domain.Entities.Tutor>? _tutors;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _tutors = await TutorRepository.GetAllAsync();
+    }
+}

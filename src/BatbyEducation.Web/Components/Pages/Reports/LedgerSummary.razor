@@ -1,0 +1,142 @@
+@page "/reports/ledger"
+@rendermode InteractiveServer
+@using MediatR
+@using BatbyEducation.Application.DTOs
+@using BatbyEducation.Application.Queries
+@using BatbyEducation.Domain.Enumerations
+@inject IMediator Mediator
+
+<PageTitle>Ledger Summary</PageTitle>
+
+<h1>Ledger Summary</h1>
+<p class="text-muted">View Cash or Bank Transfer ledger entries with totals for a date range.</p>
+
+<div class="row mb-3">
+    <div class="col-md-3">
+        <label for="ledgerType" class="form-label">Ledger Type</label>
+        <select id="ledgerType" class="form-select" @bind="SelectedLedgerType">
+            <option value="@PaymentMethod.Cash">Cash Ledger</option>
+            <option value="@PaymentMethod.BankTransfer">Bank Transfer Ledger</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label for="startDate" class="form-label">Start Date</label>
+        <input type="date" id="startDate" class="form-control" @bind="StartDate" />
+    </div>
+    <div class="col-md-3">
+        <label for="endDate" class="form-label">End Date</label>
+        <input type="date" id="endDate" class="form-control" @bind="EndDate" />
+    </div>
+    <div class="col-md-3 d-flex align-items-end">
+        <button class="btn btn-primary" @onclick="LoadReport" disabled="@IsLoading">
+            @if (IsLoading)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+            }
+            Generate Report
+        </button>
+    </div>
+</div>
+
+@if (Summary is not null)
+{
+    <div class="row mt-4 mb-3">
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Total Receipts</h6>
+                    <h4>£@Summary.TotalReceipts.ToString("N2")</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Transaction Count</h6>
+                    <h4>@Summary.TransactionCount</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (Summary.Entries.Count == 0)
+    {
+        <div class="alert alert-info">No transactions found for the selected date range.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Date</th>
+                        <th>Student Name</th>
+                        <th>Invoice Reference</th>
+                        <th class="text-end">Amount (£)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in Summary.Entries)
+                    {
+                        <tr>
+                            <td>@entry.Date.ToString("dd/MM/yyyy")</td>
+                            <td>@entry.StudentName</td>
+                            <td>@entry.InvoiceReference</td>
+                            <td class="text-end">@entry.Amount.ToString("N2")</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot class="table-light">
+                    <tr>
+                        <th colspan="3">Total</th>
+                        <th class="text-end">£@Summary.TotalReceipts.ToString("N2")</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    }
+}
+
+@if (ErrorMessage is not null)
+{
+    <div class="alert alert-danger mt-3">@ErrorMessage</div>
+}
+
+@code {
+    private PaymentMethod SelectedLedgerType { get; set; } = PaymentMethod.Cash;
+    private DateTime StartDate { get; set; } = DateTime.Today.AddMonths(-1);
+    private DateTime EndDate { get; set; } = DateTime.Today;
+    private LedgerSummaryDto? Summary { get; set; }
+    private bool IsLoading { get; set; }
+    private string? ErrorMessage { get; set; }
+
+    private async Task LoadReport()
+    {
+        ErrorMessage = null;
+        Summary = null;
+
+        if (StartDate > EndDate)
+        {
+            ErrorMessage = "Start date must be before or equal to end date.";
+            return;
+        }
+
+        IsLoading = true;
+        try
+        {
+            var query = new GetLedgerSummaryQuery(
+                SelectedLedgerType,
+                DateOnly.FromDateTime(StartDate),
+                DateOnly.FromDateTime(EndDate));
+            Summary = await Mediator.Send(query);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error loading report: {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+}

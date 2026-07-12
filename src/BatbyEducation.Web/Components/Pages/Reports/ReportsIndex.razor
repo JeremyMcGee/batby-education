@@ -1,0 +1,63 @@
+@page "/reports"
+@rendermode InteractiveServer
+
+<PageTitle>Financial Reports</PageTitle>
+
+<h1>Financial Reports</h1>
+
+<div class="row g-4 mt-2">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Revenue Report</h5>
+                <p class="card-text">View total invoiced, payments received, outstanding balances, and cash/bank breakdown for a date range.</p>
+                <a href="/reports/revenue" class="btn btn-primary">View Report</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Tutor Earnings</h5>
+                <p class="card-text">Per-tutor summary of completed session hours and invoiced revenue for a date range.</p>
+                <a href="/reports/tutor-earnings" class="btn btn-primary">View Report</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Ledger Summary</h5>
+                <p class="card-text">Cash or Bank Transfer ledger entries with totals for a date range.</p>
+                <a href="/reports/ledger" class="btn btn-primary">View Report</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Outstanding Balances</h5>
+                <p class="card-text">Per-student outstanding balances and overdue invoices list.</p>
+                <a href="/reports/balances" class="btn btn-primary">View Report</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Payment Not Received</h5>
+                <p class="card-text">Sessions where bank transfer payment has not been received on time.</p>
+                <a href="/reports/payment-not-received" class="btn btn-primary">View Report</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Tax Year Summary</h5>
+                <p class="card-text">Complete financial summary for a UK tax year with monthly breakdown.</p>
+                <a href="/reports/tax-year" class="btn btn-primary">View Report</a>
+            </div>
+        </div>
+    </div>
+</div>

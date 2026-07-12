@@ -1,0 +1,74 @@
+@page "/payments/list"
+@using BatbyEducation.Domain.Entities
+@using BatbyEducation.Domain.Enumerations
+@using BatbyEducation.Domain.Interfaces
+@inject IPaymentRepository PaymentRepository
+@inject IInvoiceRepository InvoiceRepository
+@rendermode InteractiveServer
+
+<PageTitle>Payments</PageTitle>
+
+<h3>Payments</h3>
+
+@if (_loading)
+{
+    <p>Loading payments...</p>
+}
+else if (_payments.Count == 0)
+{
+    <p class="text-muted">No payments recorded yet.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Invoice Ref</th>
+                <th>Amount</th>
+                <th>Date</th>
+                <th>Method</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var payment in _payments)
+            {
+                <tr>
+                    <td>@GetInvoiceNumber(payment.InvoiceId)</td>
+                    <td>£@payment.Amount.ToString("F2")</td>
+                    <td>@payment.PaymentDate.ToString("dd/MM/yyyy")</td>
+                    <td>
+                        <span class="badge @(payment.Method == PaymentMethod.Cash ? "bg-success" : "bg-info")">
+                            @(payment.Method == PaymentMethod.Cash ? "Cash" : "Bank Transfer")
+                        </span>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<div class="mt-3">
+    <a href="/payments" class="btn btn-primary">Record New Payment</a>
+</div>
+
+@code {
+    private List<Payment> _payments = new();
+    private Dictionary<Guid, string> _invoiceNumbers = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var payments = await PaymentRepository.GetAllAsync();
+        _payments = payments.ToList();
+
+        var invoices = await InvoiceRepository.GetAllAsync();
+        _invoiceNumbers = invoices.ToDictionary(i => i.Id, i => i.InvoiceNumber);
+
+        _loading = false;
+    }
+
+    private string GetInvoiceNumber(Guid invoiceId)
+    {
+        return _invoiceNumbers.TryGetValue(invoiceId, out var number) ? number : "Unknown";
+    }
+}
