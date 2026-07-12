@@ -30,7 +30,7 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.Property(i => i.Status)
             .HasConversion(
                 v => v.ToString(),
-                v => Enum.Parse<InvoiceStatus>(v));
+                v => v == "Issued" ? InvoiceStatus.Created : Enum.Parse<InvoiceStatus>(v));
 
         builder.HasMany(i => i.LineItems)
             .WithOne()

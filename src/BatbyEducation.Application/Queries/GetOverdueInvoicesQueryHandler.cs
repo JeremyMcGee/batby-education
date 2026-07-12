@@ -32,7 +32,7 @@ public class GetOverdueInvoicesQueryHandler : IRequestHandler<GetOverdueInvoices
             var invoices = await _invoiceRepository.GetByStudentAsync(student.Id);
 
             var overdueInvoices = invoices
-                .Where(i => (i.Status == InvoiceStatus.Issued
+                .Where(i => (i.Status == InvoiceStatus.Created
                           || i.Status == InvoiceStatus.PartiallyPaid
                           || i.Status == InvoiceStatus.Overdue)
                             && (DateTime.UtcNow - i.IssuedAt).Days > 30)

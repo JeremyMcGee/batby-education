@@ -36,7 +36,7 @@ public class GetOutstandingBalancesQueryHandler : IRequestHandler<GetOutstanding
 
             // Filter to unpaid/partially paid/overdue invoices
             var outstandingInvoices = invoices
-                .Where(i => i.Status == InvoiceStatus.Issued
+                .Where(i => i.Status == InvoiceStatus.Created
                          || i.Status == InvoiceStatus.PartiallyPaid
                          || i.Status == InvoiceStatus.Overdue)
                 .ToList();

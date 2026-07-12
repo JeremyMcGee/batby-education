@@ -2,7 +2,7 @@ namespace BatbyEducation.Domain.Enumerations;
 
 public enum InvoiceStatus
 {
-    Issued,
+    Created,
     PartiallyPaid,
     Paid,
     Overdue,

@@ -62,7 +62,7 @@ public class GetTaxYearSummaryQueryHandler : IRequestHandler<GetTaxYearSummaryQu
 
         // Outstanding receivables = unpaid/partially paid invoices minus credits
         var unpaidInvoices = invoices
-            .Where(inv => inv.Status == InvoiceStatus.Issued || inv.Status == InvoiceStatus.PartiallyPaid)
+            .Where(inv => inv.Status == InvoiceStatus.Created || inv.Status == InvoiceStatus.PartiallyPaid)
             .ToList();
         var outstandingReceivables = unpaidInvoices.Sum(inv => inv.GetOutstandingBalance());
 

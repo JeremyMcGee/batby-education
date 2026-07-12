@@ -29,7 +29,7 @@ public class GetRevenueReportQueryHandler : IRequestHandler<GetRevenueReportQuer
 
         // Calculate outstanding balance (unpaid and partially paid invoices within the range)
         var totalOutstanding = invoices
-            .Where(i => i.Status == InvoiceStatus.Issued || i.Status == InvoiceStatus.PartiallyPaid || i.Status == InvoiceStatus.Overdue)
+            .Where(i => i.Status == InvoiceStatus.Created || i.Status == InvoiceStatus.PartiallyPaid || i.Status == InvoiceStatus.Overdue)
             .Sum(i => i.GetOutstandingBalance());
 
         // Sum payments within range

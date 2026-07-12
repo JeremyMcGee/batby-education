@@ -41,7 +41,7 @@ public class Invoice : AggregateRoot
             BillingPeriodEnd = billingPeriodEnd,
             TotalAmount = 0m,
             TotalPaid = 0m,
-            Status = InvoiceStatus.Issued,
+            Status = InvoiceStatus.Created,
             IssuedAt = DateTime.UtcNow
         };
     }
