@@ -14,6 +14,10 @@ public class Student : AggregateRoot
     public string GuardianName { get; private set; } = string.Empty;
     public EmailAddress GuardianEmail { get; private set; } = null!;
     public decimal? HourlyRate { get; private set; }
+    public Guid? DefaultTutorId { get; private set; }
+    public string? DefaultSubject { get; private set; }
+    public DayOfWeek? DefaultDay { get; private set; }
+    public TimeOnly? DefaultStartTime { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
@@ -31,7 +35,11 @@ public class Student : AggregateRoot
         string phoneNumber,
         string guardianName,
         string guardianEmail,
-        decimal? hourlyRate = null)
+        decimal? hourlyRate = null,
+        Guid? defaultTutorId = null,
+        string? defaultSubject = null,
+        DayOfWeek? defaultDay = null,
+        TimeOnly? defaultStartTime = null)
     {
         var errors = new List<ValidationError>();
 
@@ -75,6 +83,10 @@ public class Student : AggregateRoot
             GuardianName = guardianName,
             GuardianEmail = new EmailAddress(guardianEmail),
             HourlyRate = hourlyRate,
+            DefaultTutorId = defaultTutorId,
+            DefaultSubject = defaultSubject,
+            DefaultDay = defaultDay,
+            DefaultStartTime = defaultStartTime,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -91,7 +103,11 @@ public class Student : AggregateRoot
         string phoneNumber,
         string guardianName,
         string guardianEmail,
-        decimal? hourlyRate = null)
+        decimal? hourlyRate = null,
+        Guid? defaultTutorId = null,
+        string? defaultSubject = null,
+        DayOfWeek? defaultDay = null,
+        TimeOnly? defaultStartTime = null)
     {
         var errors = new List<ValidationError>();
 
@@ -164,6 +180,38 @@ public class Student : AggregateRoot
             var newValue = hourlyRate.HasValue ? hourlyRate.Value.ToString() : "Not set";
             _auditHistory.Add(AuditEntry.Create(Id, nameof(Student), nameof(HourlyRate), oldValue, newValue));
             HourlyRate = hourlyRate;
+        }
+
+        if (DefaultTutorId != defaultTutorId)
+        {
+            var oldValue = DefaultTutorId.HasValue ? DefaultTutorId.Value.ToString() : "Not set";
+            var newValue = defaultTutorId.HasValue ? defaultTutorId.Value.ToString() : "Not set";
+            _auditHistory.Add(AuditEntry.Create(Id, nameof(Student), nameof(DefaultTutorId), oldValue, newValue));
+            DefaultTutorId = defaultTutorId;
+        }
+
+        if (DefaultSubject != defaultSubject)
+        {
+            var oldValue = DefaultSubject ?? "Not set";
+            var newValue = defaultSubject ?? "Not set";
+            _auditHistory.Add(AuditEntry.Create(Id, nameof(Student), nameof(DefaultSubject), oldValue, newValue));
+            DefaultSubject = defaultSubject;
+        }
+
+        if (DefaultDay != defaultDay)
+        {
+            var oldValue = DefaultDay.HasValue ? DefaultDay.Value.ToString() : "Not set";
+            var newValue = defaultDay.HasValue ? defaultDay.Value.ToString() : "Not set";
+            _auditHistory.Add(AuditEntry.Create(Id, nameof(Student), nameof(DefaultDay), oldValue, newValue));
+            DefaultDay = defaultDay;
+        }
+
+        if (DefaultStartTime != defaultStartTime)
+        {
+            var oldValue = DefaultStartTime.HasValue ? DefaultStartTime.Value.ToString("HH:mm") : "Not set";
+            var newValue = defaultStartTime.HasValue ? defaultStartTime.Value.ToString("HH:mm") : "Not set";
+            _auditHistory.Add(AuditEntry.Create(Id, nameof(Student), nameof(DefaultStartTime), oldValue, newValue));
+            DefaultStartTime = defaultStartTime;
         }
 
         UpdatedAt = now;

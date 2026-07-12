@@ -39,6 +39,12 @@ public class StudentConfiguration : IEntityTypeConfiguration<Student>
         builder.Property(s => s.HourlyRate)
             .HasPrecision(8, 2);
 
+        builder.Property(s => s.DefaultTutorId);
+        builder.Property(s => s.DefaultSubject)
+            .HasMaxLength(100);
+        builder.Property(s => s.DefaultDay);
+        builder.Property(s => s.DefaultStartTime);
+
         builder.HasMany(s => s.AuditHistory)
             .WithOne()
             .HasForeignKey(a => a.EntityId)

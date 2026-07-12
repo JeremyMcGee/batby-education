@@ -31,7 +31,11 @@ public class UpdateStudentCommandHandler : IRequestHandler<UpdateStudentCommand,
             request.PhoneNumber,
             request.GuardianName,
             request.GuardianEmail,
-            hourlyRate: request.HourlyRate);
+            hourlyRate: request.HourlyRate,
+            defaultTutorId: request.DefaultTutorId,
+            defaultSubject: request.DefaultSubject,
+            defaultDay: request.DefaultDay,
+            defaultStartTime: request.DefaultStartTime);
 
         if (!result.IsSuccess)
         {

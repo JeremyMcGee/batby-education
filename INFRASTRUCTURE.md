@@ -35,10 +35,10 @@ The system runs as a single ASP.NET Core application with an embedded SQLite dat
 
 | Table | Purpose |
 |-------|---------|
-| `Students` | Student records with optional hourly rate |
+| `Students` | Student records with optional hourly rate (`HourlyRate`) and default booking preferences (`DefaultTutorId`, `DefaultSubject`, `DefaultDay`, `DefaultStartTime`) |
 | `Tutors` | Tutor records with subjects and default rate |
 | `TutorAvailabilities` | Recurring and one-off availability slots |
-| `Sessions` | Tutoring sessions with state machine and optional rate override |
+| `Sessions` | Tutoring sessions with state machine and optional per-session `RateOverride` |
 | `Invoices` | Billing documents with line items |
 | `InvoiceLineItems` | Individual charges per session |
 | `Payments` | Payment records against invoices |

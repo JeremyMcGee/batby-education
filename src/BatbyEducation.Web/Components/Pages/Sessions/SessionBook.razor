@@ -1,11 +1,14 @@
 @page "/sessions/book"
 @using BatbyEducation.Application.Commands.Sessions
 @using BatbyEducation.Domain.Entities
+@using BatbyEducation.Domain.Enumerations
 @using BatbyEducation.Domain.Interfaces
 @using MediatR
 @inject IMediator Mediator
 @inject ITutorRepository TutorRepository
 @inject IStudentRepository StudentRepository
+@inject ITutorAvailabilityRepository AvailabilityRepository
+@inject ISessionRepository SessionRepository
 @inject NavigationManager Navigation
 @rendermode InteractiveServer
 
@@ -29,7 +32,7 @@
 
             <div class="mb-3">
                 <label for="student" class="form-label">Student</label>
-                <select id="student" class="form-select" @bind="_model.StudentId">
+                <select id="student" class="form-select" @bind="_model.StudentId" @bind:after="OnSelectionChanged">
                     <option value="">-- Select Student --</option>
                     @foreach (var student in _students)
                     {
@@ -51,8 +54,36 @@
 
             <div class="mb-3">
                 <label for="date" class="form-label">Date</label>
-                <InputDate id="date" class="form-control" @bind-Value="_model.SessionDate" />
+                <InputDate id="date" class="form-control" @bind-Value="_model.SessionDate" @bind-Value:after="OnDateChanged" />
             </div>
+
+            @if (_availableSlots.Count > 0)
+            {
+                <div class="mb-3">
+                    <label class="form-label text-success">Available slots for this day:</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach (var slot in _availableSlots)
+                        {
+                            <button type="button"
+                                    class="btn btn-sm @(slot.IsFree ? "btn-outline-success" : "btn-outline-secondary")"
+                                    disabled="@(!slot.IsFree)"
+                                    @onclick="() => SelectSlot(slot)">
+                                @slot.Start.ToString("HH:mm")–@slot.End.ToString("HH:mm")
+                                @if (!slot.IsFree)
+                                {
+                                    <span class="ms-1 text-muted">(booked)</span>
+                                }
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+            else if (_model.TutorId != Guid.Empty && _slotsLoaded)
+            {
+                <div class="mb-3">
+                    <span class="text-muted">No availability configured for this tutor on this day.</span>
+                </div>
+            }
 
             <div class="mb-3">
                 <label for="time" class="form-label">Start Time</label>
@@ -68,7 +99,18 @@
             <div class="mb-3">
                 <label for="rateOverride" class="form-label">Rate Override (£) <small class="text-muted">(optional)</small></label>
                 <input id="rateOverride" type="number" class="form-control" step="0.01" @bind="_model.RateOverride" />
-                <div class="form-text">Leave blank to use student/tutor default rate. Valid range: £0.01–£999.99</div>
+                @if (_computedRate.HasValue)
+                {
+                    <div class="form-text">
+                        <strong>Computed rate: £@_computedRate.Value.ToString("F2")/hr</strong>
+                        (@_computedRateSource)
+                        — leave blank to use this rate, or enter a value to override it.
+                    </div>
+                }
+                else
+                {
+                    <div class="form-text">Select a tutor and student to see the computed rate. Valid range: £0.01–£999.99</div>
+                }
             </div>
 
             <button type="submit" class="btn btn-primary" disabled="@_submitting">
@@ -102,6 +144,10 @@
     private List<string> _availableSubjects = new();
     private List<string> _errors = new();
     private bool _submitting;
+    private decimal? _computedRate;
+    private string _computedRateSource = string.Empty;
+    private List<SlotDisplay> _availableSlots = new();
+    private bool _slotsLoaded;
 
     protected override async Task OnInitializedAsync()
     {
@@ -112,11 +158,143 @@
         _model.DurationMinutes = 60;
     }
 
-    private void OnTutorChanged()
+    private async Task OnTutorChanged()
     {
         var selectedTutor = _tutors.FirstOrDefault(t => t.Id == _model.TutorId);
         _availableSubjects = selectedTutor?.Subjects.ToList() ?? new List<string>();
         _model.Subject = string.Empty;
+        ComputeEffectiveRate();
+        await LoadAvailableSlots();
+    }
+
+    private async Task OnSelectionChanged()
+    {
+        ComputeEffectiveRate();
+        await DefaultTutorForStudent();
+    }
+
+    private async Task OnDateChanged()
+    {
+        await LoadAvailableSlots();
+    }
+
+    private async Task LoadAvailableSlots()
+    {
+        _availableSlots.Clear();
+        _slotsLoaded = false;
+
+        if (_model.TutorId == Guid.Empty)
+            return;
+
+        var dayOfWeek = _model.SessionDate.DayOfWeek;
+
+        // Get recurring availability for this day
+        var slots = await AvailabilityRepository.GetByTutorAndDayAsync(_model.TutorId, dayOfWeek);
+
+        // Check for specific date override
+        var specificSlot = await AvailabilityRepository.GetByTutorAndDateAsync(_model.TutorId, _model.SessionDate);
+
+        var availabilityWindows = new List<(TimeOnly Start, TimeOnly End)>();
+
+        if (specificSlot is not null)
+        {
+            if (specificSlot.IsAvailable)
+                availabilityWindows.Add((specificSlot.StartTime, specificSlot.EndTime));
+            // If specific date is marked unavailable, no slots
+        }
+        else
+        {
+            availabilityWindows.AddRange(slots
+                .Where(s => s.IsAvailable)
+                .Select(s => (s.StartTime, s.EndTime)));
+        }
+
+        if (availabilityWindows.Count == 0)
+        {
+            _slotsLoaded = true;
+            return;
+        }
+
+        // Get existing bookings for this tutor on this date
+        var existingSessions = await SessionRepository.GetByTutorAndDateRangeAsync(
+            _model.TutorId, _model.SessionDate, _model.SessionDate);
+
+        var bookedSlots = existingSessions
+            .Where(s => s.Status == SessionStatus.Scheduled || s.Status == SessionStatus.PendingConfirmation)
+            .Select(s => (Start: s.StartTime, End: s.StartTime.AddMinutes(s.ScheduledDurationMinutes)))
+            .ToList();
+
+        // Show each configured availability slot directly as a bookable option
+        foreach (var (windowStart, windowEnd) in availabilityWindows.OrderBy(w => w.Start))
+        {
+            var isFree = !bookedSlots.Any(b => windowStart < b.End && windowEnd > b.Start);
+            _availableSlots.Add(new SlotDisplay(windowStart, windowEnd, isFree));
+        }
+
+        _slotsLoaded = true;
+    }
+
+    private void SelectSlot(SlotDisplay slot)
+    {
+        _model.StartTime = slot.Start;
+        _model.DurationMinutes = (int)(slot.End - slot.Start).TotalMinutes;
+    }
+
+    private async Task DefaultTutorForStudent()
+    {
+        if (_model.StudentId == Guid.Empty)
+            return;
+
+        var student = _students.FirstOrDefault(s => s.Id == _model.StudentId);
+        if (student is null)
+            return;
+
+        // Apply stored booking preferences
+        if (student.DefaultTutorId.HasValue && _model.TutorId == Guid.Empty)
+        {
+            _model.TutorId = student.DefaultTutorId.Value;
+            await OnTutorChanged();
+        }
+
+        if (!string.IsNullOrWhiteSpace(student.DefaultSubject))
+        {
+            _model.Subject = student.DefaultSubject;
+        }
+
+        if (student.DefaultDay.HasValue)
+        {
+            // Set the session date to the next occurrence of the preferred day
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            var daysUntil = ((int)student.DefaultDay.Value - (int)today.DayOfWeek + 7) % 7;
+            if (daysUntil == 0) daysUntil = 7; // Always pick next week if today is the preferred day
+            _model.SessionDate = today.AddDays(daysUntil);
+            await LoadAvailableSlots();
+        }
+
+        if (student.DefaultStartTime.HasValue)
+        {
+            _model.StartTime = student.DefaultStartTime.Value;
+        }
+    }
+
+    private void ComputeEffectiveRate()
+    {
+        _computedRate = null;
+        _computedRateSource = string.Empty;
+
+        var selectedStudent = _students.FirstOrDefault(s => s.Id == _model.StudentId);
+        var selectedTutor = _tutors.FirstOrDefault(t => t.Id == _model.TutorId);
+
+        if (selectedStudent?.HourlyRate is not null)
+        {
+            _computedRate = selectedStudent.HourlyRate;
+            _computedRateSource = "student rate";
+        }
+        else if (selectedTutor is not null)
+        {
+            _computedRate = selectedTutor.HourlyRate;
+            _computedRateSource = "tutor default rate";
+        }
     }
 
     private async Task HandleSubmit()
@@ -181,4 +359,6 @@
         public int DurationMinutes { get; set; }
         public decimal? RateOverride { get; set; }
     }
+
+    private record SlotDisplay(TimeOnly Start, TimeOnly End, bool IsFree);
 }

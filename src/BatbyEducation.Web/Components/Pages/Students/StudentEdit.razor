@@ -7,6 +7,8 @@
 @using MediatR
 @inject IMediator Mediator
 @inject IStudentRepository StudentRepository
+@inject ITutorRepository TutorRepository
+@inject ITutorAvailabilityRepository AvailabilityRepository
 @inject IAuditEntryRepository AuditEntryRepository
 @inject NavigationManager Navigation
 
@@ -83,6 +85,72 @@ else
                     }
                 </div>
 
+                <hr class="my-4" />
+                <h5>Default Booking Preferences <small class="text-muted">(optional)</small></h5>
+                <p class="text-muted small">These will be pre-filled when booking a session for this student.</p>
+
+                <div class="mb-3">
+                    <label for="defaultTutor" class="form-label">Default Tutor</label>
+                    <select id="defaultTutor" class="form-select" @bind="_model.DefaultTutorId" @bind:after="OnDefaultTutorChanged">
+                        <option value="">-- None --</option>
+                        @foreach (var tutor in _tutors)
+                        {
+                            <option value="@tutor.Id">@tutor.Name</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="defaultSubject" class="form-label">Default Subject</label>
+                    <select id="defaultSubject" class="form-select" @bind="_model.DefaultSubject">
+                        <option value="">-- None --</option>
+                        @foreach (var subject in _availableSubjects)
+                        {
+                            <option value="@subject">@subject</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="defaultDay" class="form-label">Default Day</label>
+                    <select id="defaultDay" class="form-select" @bind="_model.DefaultDay" @bind:after="OnDefaultDayChanged">
+                        <option value="">-- None --</option>
+                        <option value="@DayOfWeek.Monday">Monday</option>
+                        <option value="@DayOfWeek.Tuesday">Tuesday</option>
+                        <option value="@DayOfWeek.Wednesday">Wednesday</option>
+                        <option value="@DayOfWeek.Thursday">Thursday</option>
+                        <option value="@DayOfWeek.Friday">Friday</option>
+                        <option value="@DayOfWeek.Saturday">Saturday</option>
+                        <option value="@DayOfWeek.Sunday">Sunday</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Default Slot</label>
+                    @if (_defaultSlots.Count > 0)
+                    {
+                        <div class="d-flex flex-wrap gap-2">
+                            @foreach (var slot in _defaultSlots)
+                            {
+                                var isSelected = _model.DefaultStartTime == slot.Start;
+                                <button type="button"
+                                        class="btn btn-sm @(isSelected ? "btn-success" : "btn-outline-success")"
+                                        @onclick="() => SelectDefaultSlot(slot)">
+                                    @slot.Start.ToString("HH:mm")–@slot.End.ToString("HH:mm")
+                                </button>
+                            }
+                        </div>
+                    }
+                    else if (_model.DefaultTutorId.HasValue && _model.DefaultDay.HasValue)
+                    {
+                        <div class="text-muted">No slots configured for this tutor on this day.</div>
+                    }
+                    else
+                    {
+                        <div class="text-muted">Select a tutor and day to see available slots.</div>
+                    }
+                </div>
+
                 @if (_generalError is not null)
                 {
                     <div class="alert alert-danger">@_generalError</div>
@@ -141,9 +209,14 @@ else
     private bool _loading = true;
     private bool _notFound;
     private IReadOnlyList<AuditEntry>? _auditEntries;
+    private List<Tutor> _tutors = new();
+    private List<string> _availableSubjects = new();
+    private List<(TimeOnly Start, TimeOnly End)> _defaultSlots = new();
 
     protected override async Task OnInitializedAsync()
     {
+        _tutors = (await TutorRepository.GetAllAsync()).ToList();
+
         var student = await StudentRepository.GetByIdAsync(Id);
         if (student is null)
         {
@@ -158,11 +231,62 @@ else
                 PhoneNumber = student.PhoneNumber,
                 GuardianName = student.GuardianName,
                 GuardianEmail = student.GuardianEmail.Value,
-                HourlyRate = student.HourlyRate
+                HourlyRate = student.HourlyRate,
+                DefaultTutorId = student.DefaultTutorId,
+                DefaultSubject = student.DefaultSubject,
+                DefaultDay = student.DefaultDay,
+                DefaultStartTime = student.DefaultStartTime
             };
+
+            // Populate subjects for the selected default tutor
+            if (_model.DefaultTutorId.HasValue)
+            {
+                var selectedTutor = _tutors.FirstOrDefault(t => t.Id == _model.DefaultTutorId);
+                _availableSubjects = selectedTutor?.Subjects.ToList() ?? new List<string>();
+            }
+
+            // Load default slots if tutor and day are set
+            await LoadDefaultSlots();
+
             _auditEntries = await AuditEntryRepository.GetByEntityIdAsync(Id);
         }
         _loading = false;
+    }
+
+    private async Task OnDefaultTutorChanged()
+    {
+        var selectedTutor = _tutors.FirstOrDefault(t => t.Id == _model.DefaultTutorId);
+        _availableSubjects = selectedTutor?.Subjects.ToList() ?? new List<string>();
+        if (_availableSubjects.Count > 0 && !_availableSubjects.Contains(_model.DefaultSubject ?? ""))
+        {
+            _model.DefaultSubject = null;
+        }
+        await LoadDefaultSlots();
+    }
+
+    private async Task OnDefaultDayChanged()
+    {
+        await LoadDefaultSlots();
+    }
+
+    private async Task LoadDefaultSlots()
+    {
+        _defaultSlots.Clear();
+
+        if (!_model.DefaultTutorId.HasValue || !_model.DefaultDay.HasValue)
+            return;
+
+        var slots = await AvailabilityRepository.GetByTutorAndDayAsync(_model.DefaultTutorId.Value, _model.DefaultDay.Value);
+        _defaultSlots = slots
+            .Where(s => s.IsAvailable)
+            .OrderBy(s => s.StartTime)
+            .Select(s => (s.StartTime, s.EndTime))
+            .ToList();
+    }
+
+    private void SelectDefaultSlot((TimeOnly Start, TimeOnly End) slot)
+    {
+        _model.DefaultStartTime = slot.Start;
     }
 
     private string? GetError(string field) =>
@@ -184,7 +308,11 @@ else
                 _model.PhoneNumber,
                 _model.GuardianName,
                 _model.GuardianEmail,
-                _model.HourlyRate);
+                _model.HourlyRate,
+                _model.DefaultTutorId,
+                _model.DefaultSubject,
+                _model.DefaultDay,
+                _model.DefaultStartTime);
 
             var result = await Mediator.Send(command);
 
@@ -216,5 +344,9 @@ else
         public string GuardianName { get; set; } = string.Empty;
         public string GuardianEmail { get; set; } = string.Empty;
         public decimal? HourlyRate { get; set; }
+        public Guid? DefaultTutorId { get; set; }
+        public string? DefaultSubject { get; set; }
+        public DayOfWeek? DefaultDay { get; set; }
+        public TimeOnly? DefaultStartTime { get; set; }
     }
 }

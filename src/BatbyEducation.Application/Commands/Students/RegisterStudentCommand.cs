@@ -9,4 +9,8 @@ public record RegisterStudentCommand(
     string PhoneNumber,
     string GuardianName,
     string GuardianEmail,
-    decimal? HourlyRate = null) : IRequest<Result<Guid>>;
+    decimal? HourlyRate = null,
+    Guid? DefaultTutorId = null,
+    string? DefaultSubject = null,
+    DayOfWeek? DefaultDay = null,
+    TimeOnly? DefaultStartTime = null) : IRequest<Result<Guid>>;

@@ -23,7 +23,7 @@ The system follows **Clean Architecture** with **CQRS** (Command Query Responsib
 Pure C# with zero external dependencies (aside from MediatR.Contracts for the `INotification` marker interface on domain events).
 
 Contains:
-- **Entities** — `Student`, `Tutor`, `Session`, `Invoice`, `Payment`, `LedgerEntry`, `StudentAccount`, `AuditEntry`, `TutorAvailability`, `InvoiceLineItem`
+- **Entities** — `Student` (with `HourlyRate`, `DefaultTutorId`, `DefaultSubject`, `DefaultDay`, `DefaultStartTime`), `Tutor`, `Session` (with `RateOverride`), `Invoice`, `Payment`, `LedgerEntry`, `StudentAccount`, `AuditEntry`, `TutorAvailability`, `InvoiceLineItem`
 - **Value Objects** — `Money`, `DateRange`, `EmailAddress`
 - **Enumerations** — `SessionStatus`, `InvoiceStatus`, `PaymentMethod`
 - **Domain Events** — `SessionCompletedEvent`, `SessionCancelledEvent`, `PaymentRecordedEvent`, `InvoicePaidEvent`
