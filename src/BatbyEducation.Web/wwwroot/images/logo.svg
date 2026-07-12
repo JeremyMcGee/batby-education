@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" width="240" height="60">
+  <!-- Open book -->
+  <path d="M20 45 L20 15 Q35 12 50 15 L50 45 Q35 42 20 45Z" fill="#fff" opacity="0.9"/>
+  <path d="M50 45 L50 15 Q65 12 80 15 L80 45 Q65 42 50 45Z" fill="#e2e8f0" opacity="0.9"/>
+  <!-- Book spine -->
+  <line x1="50" y1="14" x2="50" y2="46" stroke="#a0aec0" stroke-width="1.5"/>
+  <!-- Page lines -->
+  <line x1="26" y1="22" x2="44" y2="20" stroke="#2c5282" stroke-width="0.8" opacity="0.5"/>
+  <line x1="26" y1="27" x2="44" y2="25" stroke="#2c5282" stroke-width="0.8" opacity="0.5"/>
+  <line x1="26" y1="32" x2="44" y2="30" stroke="#2c5282" stroke-width="0.8" opacity="0.5"/>
+  <line x1="56" y1="20" x2="74" y2="22" stroke="#2c5282" stroke-width="0.8" opacity="0.4"/>
+  <line x1="56" y1="25" x2="74" y2="27" stroke="#2c5282" stroke-width="0.8" opacity="0.4"/>
+  <line x1="56" y1="30" x2="74" y2="32" stroke="#2c5282" stroke-width="0.8" opacity="0.4"/>
+  <!-- Pen nib -->
+  <path d="M72 10 L78 10 L75 18Z" fill="#fc8181"/>
+  <rect x="72" y="4" width="6" height="6" rx="1" fill="#e2e8f0"/>
+  <!-- Text -->
+  <text x="90" y="30" font-family="Georgia, serif" font-size="20" font-weight="bold" fill="#ffffff">Batby</text>
+  <text x="90" y="48" font-family="Georgia, serif" font-size="13" fill="#cbd5e0" letter-spacing="1">EDUCATION</text>
+  <!-- Subtle underline -->
+  <line x1="90" y1="52" x2="195" y2="52" stroke="#fc8181" stroke-width="2" opacity="0.7"/>
+</svg>
